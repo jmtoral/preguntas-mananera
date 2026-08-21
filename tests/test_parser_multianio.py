@@ -166,3 +166,64 @@ def test_una_periodista_aparece_en_dos_conferencias_distintas(confs) -> None:
 def test_el_cierre_de_documento_esta_en_las_cinco(confs) -> None:
     for fecha, c in confs.items():
         assert c.tenia_fin_de_documento, fecha
+
+
+# ===========================================================================
+# Cambios de formato encontrados al bajar el corpus (fase 5)
+# ===========================================================================
+
+
+def test_interlocutor_es_prensa_no_funcionario() -> None:
+    """La forma de octubre de 2024, antes de estandarizar `PREGUNTA`.
+
+    421 turnos en 18 conferencias, todas entre el 2024-10-03 y el 2024-10-29.
+    Tratarlos como funcionarios convierte preguntas de periodistas en
+    declaraciones de gobierno, que es el peor error posible aquí.
+    """
+    from estenograficas.parser import clasificar_etiqueta
+
+    for etiqueta in ("INTERLOCUTOR", "INTERLOCUTORA", "INTERLOCUTORES"):
+        assert clasificar_etiqueta(etiqueta) == ("prensa", None, None), etiqueta
+
+
+def test_asistentes_es_ruido_de_sala() -> None:
+    from estenograficas.parser import clasificar_etiqueta
+
+    assert clasificar_etiqueta("ASISTENTES")[0] == "anonimo"
+
+
+def test_la_etiqueta_se_orienta_por_donde_esta_el_cargo() -> None:
+    """En 2026 es CARGO, NOMBRE; en octubre de 2024 es NOMBRE, CARGO.
+
+    Un rsplit a ciegas intercambia los campos en un tercio de los funcionarios.
+    """
+    from estenograficas.parser import clasificar_etiqueta
+
+    # 2026: cargo primero
+    tipo, cargo, quien = clasificar_etiqueta(
+        "DIRECTOR GENERAL DEL IMSS, ZOÉ ROBLEDO ABURTO"
+    )
+    assert (tipo, cargo, quien) == ("funcionario", "DIRECTOR GENERAL DEL IMSS", "ZOÉ ROBLEDO ABURTO")
+
+    # 2024: nombre primero
+    tipo, cargo, quien = clasificar_etiqueta(
+        "CITLALLI HERNÁNDEZ MORA, SECRETARIA DE LAS MUJERES"
+    )
+    assert (tipo, cargo, quien) == ("funcionario", "SECRETARIA DE LAS MUJERES", "CITLALLI HERNÁNDEZ MORA")
+
+    tipo, cargo, quien = clasificar_etiqueta(
+        "MARIO DELGADO CARRILLO, SECRETARIO DE EDUCACIÓN PÚBLICA"
+    )
+    assert cargo == "SECRETARIO DE EDUCACIÓN PÚBLICA"
+    assert quien == "MARIO DELGADO CARRILLO"
+
+
+def test_si_los_dos_lados_parecen_cargo_no_se_invierte() -> None:
+    """Ante la duda se respeta el orden dominante del corpus, CARGO, NOMBRE."""
+    from estenograficas.parser import clasificar_etiqueta
+
+    _, cargo, quien = clasificar_etiqueta(
+        "SECRETARIO DE MARINA, ALMIRANTE RAYMUNDO PEDRO MORALES"
+    )
+    assert cargo == "SECRETARIO DE MARINA"
+    assert quien == "ALMIRANTE RAYMUNDO PEDRO MORALES"

@@ -83,9 +83,36 @@ _ETIQUETA = re.compile(
     re.MULTILINE,
 )
 
-# Etiquetas que no son un hablante identificable de la conferencia.
-_PRENSA = {"PREGUNTA", "PREGUNTAS"}
-_RUIDO_DE_SALA = {"INTERVENCIÓN", "INTERVENCION", "INTERVENCIONES"}
+# Etiquetas de prensa. `INTERLOCUTOR` e `INTERLOCUTORA` son la forma que se usó
+# en octubre de 2024, antes de que se estandarizara `PREGUNTA`: 421 turnos en 18
+# conferencias, todas entre el 2024-10-03 y el 2024-10-29. Sin ellas, esos 421
+# turnos de periodistas se contaban como intervenciones de funcionarios, que es
+# el error más caro posible en un proyecto que mide qué pregunta la prensa.
+_PRENSA = {
+    "PREGUNTA", "PREGUNTAS",
+    "INTERLOCUTOR", "INTERLOCUTORA", "INTERLOCUTORES", "INTERLOCUTORAS",
+}
+# `ASISTENTES` es el pleno coreando; no es un hablante.
+_RUIDO_DE_SALA = {
+    "INTERVENCIÓN", "INTERVENCION", "INTERVENCIONES", "ASISTENTES",
+}
+
+# Palabras que denotan un cargo. Sirven para orientar la etiqueta: en 2026 el
+# formato es `CARGO, NOMBRE` pero en octubre de 2024 es `NOMBRE, CARGO`
+# (`CITLALLI HERNÁNDEZ MORA, SECRETARIA DE LAS MUJERES`). Sobre las 90 primeras
+# conferencias son 116 al derecho contra 60 al revés: un `rsplit` a ciegas
+# intercambia cargo y nombre en un tercio de los funcionarios.
+_PALABRAS_DE_CARGO = (
+    "SECRETARI", "SUBSECRETARI", "DIRECTOR", "DIRECTORA", "TITULAR",
+    "PRESIDENT", "COORDINADOR", "GOBERNADOR", "COMISIONAD", "JEFE", "JEFA",
+    "CONSEJER", "VOCERO", "VOCERA", "ALMIRANTE", "GENERAL", "PROCURADOR",
+    "FISCAL", "EMBAJADOR", "MAGISTRAD", "MINISTR", "RECTOR", "GERENTE",
+    "ENCARGAD", "SUBDIRECTOR", "ADMINISTRADOR",
+)
+
+
+def _tiene_cargo(s: str) -> bool:
+    return any(p in s for p in _PALABRAS_DE_CARGO)
 # Sobrevivientes de un bloque de video mal cerrado. No deberían aparecer; si
 # aparecen es señal de que la limpieza de videos falló y hay que enterarse.
 _VOCES_DE_VIDEO = re.compile(
@@ -117,8 +144,13 @@ def clasificar_etiqueta(etiqueta: str) -> tuple[Tipo, str | None, str | None]:
         return "anonimo", None, None
 
     if "," in et:
-        cargo, hablante = et.rsplit(",", 1)
-        return "funcionario", cargo.strip(), hablante.strip()
+        izquierda, derecha = (p.strip() for p in et.rsplit(",", 1))
+        izq_plano, der_plano = _sin_acentos_may(izquierda), _sin_acentos_may(derecha)
+        # Se orienta por dónde está el cargo, no por la posición. Si solo el
+        # lado derecho nombra un cargo, la etiqueta viene NOMBRE, CARGO.
+        if _tiene_cargo(der_plano) and not _tiene_cargo(izq_plano):
+            return "funcionario", derecha, izquierda
+        return "funcionario", izquierda, derecha
 
     # Mayúsculas, con dos puntos, sin coma y sin ser prensa ni ruido conocido.
     # Puede ser un funcionario sin cargo o una etiqueta que no conocemos; se
