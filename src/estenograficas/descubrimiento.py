@@ -174,6 +174,127 @@ def urls_wayback(ventanas: Iterable[tuple[str, str]] | None = None) -> list[Regi
 
 
 # ---------------------------------------------------------------------------
+# gob.mx, con navegador
+# ---------------------------------------------------------------------------
+
+GOBMX = "https://www.gob.mx"
+LISTADO = GOBMX + "/presidencia/archivo/articulos?order=DESC&page={}"
+
+# Los artículos de conferencia matutina llevan este fragmento en el slug. El
+# archivo mezcla otras versiones estenográficas (derecho de réplica, eventos),
+# que se recogen igual y se reportan aparte: nada se descarta en silencio.
+_ES_CONFERENCIA = "conferencia-de-prensa-de-la-presidenta"
+_ES_ESTENOGRAFICA = "version-estenografica"
+
+# El reto anti-bot de gob.mx NO se pasa en headless: se probó con espera de
+# 50 segundos y con parches a navigator.webdriver, plugins, languages y
+# window.chrome, y sigue devolviendo la página de Challenge Validation.
+# Headful pasa en 1.7 segundos. La ventana se manda fuera de pantalla para no
+# estorbar, pero esto implica que el proceso necesita un escritorio.
+_ARGS_NAVEGADOR = ["--window-position=-2400,-2400", "--window-size=1280,900"]
+
+
+def _abrir_navegador(pw):
+    nav = pw.chromium.launch(headless=False, args=_ARGS_NAVEGADOR)
+    ctx = nav.new_context(
+        locale="es-MX", user_agent=UA, viewport={"width": 1280, "height": 900}
+    )
+    return nav, ctx
+
+
+def _hrefs_de_pagina(pagina_web, n: int) -> list[str]:
+    pagina_web.goto(LISTADO.format(n), wait_until="domcontentloaded", timeout=60000)
+    pagina_web.wait_for_timeout(800)
+    crudos = pagina_web.eval_on_selector_all(
+        "a[href*='/presidencia/articulos/']",
+        "els => els.map(e => e.getAttribute('href'))",
+    )
+    vistos: dict[str, None] = {}
+    for h in crudos:
+        if h and _ES_ESTENOGRAFICA in h:
+            vistos.setdefault(h.split("?")[0], None)
+    return list(vistos)
+
+
+def recorrer_archivo(
+    ck: Any,
+    max_paginas: int = 200,
+    espera: float = 1.0,
+    vacias_para_parar: int = 2,
+) -> Iterator[tuple[int, int]]:
+    """Recorre el archivo paginado y guarda los enlaces en el checkpoint.
+
+    Rinde `(pagina, cuantos_enlaces)` conforme avanza. Reanudable: las páginas
+    ya registradas no se vuelven a pedir.
+
+    Para tras `vacias_para_parar` páginas seguidas sin artículos. Al 2026-08-21
+    la última con contenido era la 108, que cae en el 3-4 de octubre de 2024,
+    justo el inicio del sexenio; el margen es por si el archivo crece.
+    """
+    from playwright.sync_api import sync_playwright
+
+    pendientes = [n for n in range(1, max_paginas + 1) if f"pagina-{n}" not in ck.hechos()]
+    if not pendientes:
+        return
+
+    with sync_playwright() as pw:
+        nav, ctx = _abrir_navegador(pw)
+        pagina_web = ctx.new_page()
+        vacias = 0
+        try:
+            for n in pendientes:
+                try:
+                    hrefs = _hrefs_de_pagina(pagina_web, n)
+                except Exception as e:
+                    ck.marcar_rechazado(f"pagina-{n}", razon=f"{type(e).__name__}: {e}")
+                    continue
+                ck.marcar_hecho(f"pagina-{n}", hrefs=hrefs)
+                yield n, len(hrefs)
+                vacias = vacias + 1 if not hrefs else 0
+                if vacias >= vacias_para_parar:
+                    break
+                time.sleep(espera)
+        finally:
+            ctx.close()
+            nav.close()
+
+
+def urls_gobmx(ck: Any) -> tuple[list[RegistroURL], list[str]]:
+    """Arma los registros a partir de lo que el checkpoint ya tiene guardado.
+
+    Devuelve `(conferencias, otras_estenograficas)`. Lo segundo son versiones
+    estenográficas que no son conferencia matutina —derecho de réplica, giras,
+    eventos—: no entran al corpus pero se reportan, porque un pipeline que
+    "funciona" tirando lo que no entiende está roto.
+    """
+    por_fecha: dict[str, RegistroURL] = {}
+    sin_fecha: list[RegistroURL] = []
+    otras: list[str] = []
+
+    for registro in ck.hechos().values():
+        for href in registro.get("hrefs", []):
+            if _ES_CONFERENCIA not in href:
+                otras.append(href)
+                continue
+            slug = href.split("/articulos/", 1)[-1]
+            url = href if href.startswith("http") else GOBMX + href
+            f = fecha_de_slug(slug)
+            reg = RegistroURL(
+                conferencia_id=f.isoformat() if f else None,
+                slug=slug,
+                url_descarga=url,
+                url_original=url,
+                fuente="gobmx",
+            )
+            if f is None:
+                sin_fecha.append(reg)
+            else:
+                por_fecha.setdefault(f.isoformat(), reg)
+
+    return [por_fecha[k] for k in sorted(por_fecha)] + sin_fecha, sorted(set(otras))
+
+
+# ---------------------------------------------------------------------------
 # Diagnóstico
 # ---------------------------------------------------------------------------
 
@@ -264,3 +385,69 @@ def leer_urls(origen: Path) -> list[RegistroURL]:
         for l in origen.read_text(encoding="utf-8").splitlines()
         if l.strip()
     ]
+
+
+# ---------------------------------------------------------------------------
+# Ejecución
+# ---------------------------------------------------------------------------
+
+
+def main(hasta: date | None = None) -> int:
+    """Corre el descubrimiento completo y escribe `data/interim/urls.jsonl`.
+
+    `python -m estenograficas.descubrimiento`
+    """
+    from .checkpoint import Checkpoint
+    from .config import paths
+
+    p = paths()
+    p.ensure_dirs()
+    hasta = hasta or date.today()
+
+    print("== gob.mx (fuente principal) ==")
+    ck = Checkpoint("descubrimiento_gobmx")
+    ya = len(ck.hechos())
+    if ya:
+        print(f"   {ya} páginas ya registradas; se reanuda")
+    for n, cuantos in recorrer_archivo(ck):
+        if n % 10 == 0 or cuantos == 0:
+            print(f"   página {n:>4}: {cuantos} enlaces")
+    de_gobmx, otras = urls_gobmx(ck)
+    print(f"   páginas recorridas   : {len(ck.hechos())}")
+    print(f"   páginas con error    : {len(ck.rechazados())}")
+    print(f"   conferencias         : {len(de_gobmx)}")
+    print(f"   otras estenográficas : {len(otras)} (no entran al corpus)")
+
+    print("\n== Wayback (respaldo) ==")
+    de_wayback = urls_wayback()
+    print(f"   conferencias archivadas: {len(de_wayback)}")
+
+    todas = fusionar(de_gobmx, de_wayback)
+    n = escribir_urls(todas, p.urls)
+    print(f"\n== {n} URLs escritas en {p.urls} ==")
+
+    r = resumen(todas, hasta)
+    for k, v in r.items():
+        print(f"   {k}: {v}")
+
+    print("\n== conteo por mes ==")
+    for mes, cuantas in conteo_por_mes(todas).items():
+        print(f"   {mes}  {cuantas:>3}  {'#' * cuantas}")
+
+    faltan = huecos(todas, hasta)
+    print(f"\n== {len(faltan)} días hábiles sin URL ==")
+    print("   (incluye festivos y giras; no todos son conferencias perdidas)")
+    for d in faltan[:40]:
+        print(f"   {d}")
+    if len(faltan) > 40:
+        print(f"   ... y {len(faltan) - 40} más")
+
+    # Nada se descarta en silencio: las otras estenográficas quedan en disco.
+    otras_path = p.interim / "otras_estenograficas.txt"
+    otras_path.write_text("\n".join(otras) + "\n", encoding="utf-8")
+    print(f"\n   las {len(otras)} descartadas quedaron en {otras_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -8,16 +8,47 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Estado
 
-**Fase actual:** 3 terminada. **Fase 4 a medias**, ver abajo.
+**Fase actual:** 4 (descubrimiento de URLs) terminada. Fase 5 (descarga) no iniciada.
 **Última actualización:** 2026-08-21, cerrando la sesión.
 **Ambiente conda:** **`votaciones_corte`**, Python 3.11.14, en `C:\Users\User\anaconda3\envs\votaciones_corte`. Aprobado por el humano el 2026-08-21 para usarse directo, sin clonar.
 **Bloqueado esperando:** nada. Se puede continuar directo.
 
-**Fase actual, con precisión:** la 4 está a medio hacer. Existe `src/estenograficas/descubrimiento.py` con la mitad de Wayback escrita, pero **sin pruebas, sin haberse ejecutado nunca y sin commitear a la hora de escribir esto**. Falta la mitad de gob.mx, que es la que ahora conviene que sea la principal. **No existe `data/interim/urls.jsonl`.**
 
 ## Hecho
 
-### Playwright contra gob.mx: reconocimiento (fase 4, a medias)
+### Descubrimiento de URLs (fase 4) — TERMINADA
+
+`src/estenograficas/descubrimiento.py` completo, con `tests/test_descubrimiento.py` (20 pruebas). **98 pruebas en total, 98 pasan.**
+
+Se corre con `python -m estenograficas.descubrimiento`. Reanudable: el recorrido del archivo usa el módulo `checkpoint`, una entrada por página, así que si se interrumpe no vuelve a pedir lo ya hecho.
+
+**Salida: `data/interim/urls.jsonl`, 464 URLs.**
+
+| | |
+|---|---|
+| de gob.mx | 462 |
+| de Wayback | 2 |
+| sin fecha en el slug | 4 |
+| días hábiles del sexenio | 494 |
+| días cubiertos | 459 |
+| **cobertura** | **92.9%** |
+
+El recorrido tomó 110 páginas y no dio ni un error. Wayback aportó exactamente 2 fechas que gob.mx no tenía: ese es el papel de respaldo funcionando, y justifica haber conservado la estrategia mixta aunque gob.mx resultara casi completo.
+
+**Conteo por mes:** entre 17 y 23 conferencias mensuales, sin ningún mes anómalo. Los extremos bajos son diciembre de 2025 (17) y noviembre de 2024 y 2025 (18); el alto es julio de 2025 y 2026 (23). Agosto de 2026 va en 14 porque el mes no ha terminado.
+
+**Los 35 días hábiles sin URL son casi todos festivos identificables**, no conferencias perdidas: 24, 25 y 31 de diciembre y 1 de enero de los dos años; Semana Santa (17-18 de abril de 2025, 2-3 de abril de 2026); 15 y 16 de septiembre; 5 de febrero; 18 de marzo; 20 de noviembre; 5 de mayo; 1 y 2 de octubre de 2024, que son anteriores a la primera conferencia (3 de octubre); y el 21 de agosto de 2026, que es hoy.
+
+Quedan **como una docena sin explicación obvia** y hay que mirarlos en la fase 6: 2024-10-28, 2024-11-18, 2024-11-19, 2024-12-12, 2025-06-16, 2025-06-17, 2025-09-01 (día del Informe), 2025-11-10, 2025-12-05, 2025-12-12 y 2026-04-17. Pueden ser giras, puede ser que la conferencia exista bajo otro slug.
+
+**Las 4 URLs sin fecha en el slug:**
+
+- Tres son el mismo `-del-30-de-marzo-de-202`, con el año truncado, y vienen de Wayback con statuscode 301. Esa fecha ya está cubierta por otra URL, así que son redirecciones duplicadas.
+- Una es real y distinta: **`...-de-la-presidenta-de-mexico-claudia-sheinbaum-pardo-en-culiacan-sinaloa`**. Una conferencia fuera de Palacio Nacional, con un patrón de slug sin fecha. Su `conferencia_id` tiene que salir del contenido en la fase 5. Confirma que no se podían construir slugs por fecha.
+
+**497 versiones estenográficas descartadas** por no ser conferencia matutina —derecho de réplica, giras, eventos—. No se tiraron en silencio: quedaron listadas en `data/interim/otras_estenograficas.txt` por si alguna resulta relevante.
+
+### Playwright contra gob.mx: reconocimiento
 
 Aprobado e instalado el 2026-08-21: `playwright` más Chromium (114.5 MB). **Funciona, pero con una condición que cambia el plan.**
 
@@ -248,14 +279,20 @@ El humano dijo el 2026-08-21 que todavía no le queda claro en qué consiste su 
 
 ## Siguiente paso concreto
 
-**Terminar la fase 4.** Todo lo que hace falta ya está probado a mano; lo que falta es volverlo código con pruebas.
+**Fase 5: descarga.** Escribir `src/estenograficas/descarga.py` que consuma `data/interim/urls.jsonl` y baje el HTML crudo a `data/raw/{conferencia_id}.html`.
 
-1. **Escribir la mitad de gob.mx en `descubrimiento.py`.** Recorrer las 108 páginas del archivo con Playwright headful, ventana fuera de pantalla, un request por segundo, checkpoint por página con el módulo `checkpoint` que ya existe. Quedarse con los `href` que contengan `conferencia-de-prensa-de-la-presidenta`. **No construir slugs**: se conservan tal como vienen, que para eso se recorre el listado.
-2. **Fusionar con Wayback.** `fusionar()` ya está escrita y da prioridad a gob.mx sobre Wayback; revisar que esa prioridad siga siendo la correcta ahora que gob.mx es la fuente principal (lo es).
-3. **Escribir `data/interim/urls.jsonl`** y correr el diagnóstico que pide la fase 4: conteo por mes y meses con huecos sospechosos. `conteo_por_mes()`, `huecos()` y `resumen()` ya están escritas.
-4. **Pruebas.** `descubrimiento.py` **no tiene ni una**. Como mínimo: `fecha_de_slug` contra los slugs con errata reales (año truncado, `%5C`, sufijo numérico), y `fusionar` contra el caso de la misma fecha en las dos fuentes.
+Requisitos que ya están decididos y no hay que volver a discutir:
 
-Fragmento que ya funciona, para no volver a descubrirlo:
+- **Playwright headful** para gob.mx, ventana fuera de pantalla, reutilizando **un solo contexto** para todas las descargas: ya se probaron cinco seguidas a un request por segundo sin que el reto reapareciera. Abrir un navegador por página sería absurdo.
+- **Un request por segundo**, reintentos con backoff, **checkpoint conforme avanza** con el módulo `checkpoint`.
+- **El HTML crudo es inmutable**: si `data/raw/{id}.html` ya existe, no se vuelve a bajar ni se sobreescribe.
+- **Manejar gzip.** Ya mordió una vez en la fase 3: una captura vino comprimida y se guardó binario.
+- **Wayback como respaldo** para las URLs de gob.mx que fallen, no como fuente por defecto.
+- Las 4 URLs sin `conferencia_id` necesitan que la fecha salga del **contenido**, no del slug. La de Culiacán es una conferencia real.
+- Al terminar, **recordarle al humano respaldar `data/raw/` fuera del repo** antes de que nada lo consuma.
+- Diagnóstico que pide la fase: tasa de éxito y lista de fallos.
+
+Fragmento de Playwright que ya funciona, para no volver a descubrirlo:
 
 ```python
 nav = p.chromium.launch(
@@ -306,10 +343,10 @@ ctx = nav.new_context(locale="es-MX", user_agent=UA,
 | La fecha canónica saldrá del contenido, no del slug | Confirmado que los slugs traen año truncado, backslash pegado y sufijos numéricos | previa a 4 |
 | Playwright corre headful con la ventana fuera de pantalla | Headless no pasa el reto de gob.mx en ninguna variante probada; fuera de pantalla es el compromiso que no estorba al usuario | 4 |
 | gob.mx pasa a ser la fuente principal y Wayback el respaldo | El archivo entero son 108 páginas, ~2 minutos. La estrategia mixta se decidió creyendo que era caro; no lo es. Da además la URL canónica | 4 |
+| Las estenográficas que no son conferencia matutina se listan aparte | Regla dura 3: nada se descarta en silencio. Son 497 y quedaron en otras_estenograficas.txt por si alguna resulta relevante | 4 |
+| El recorrido del archivo lleva checkpoint por página | Son 110 páginas con navegador; si se corta a la mitad no tiene sentido volver a empezar | 4 |
 
 ## Problemas abiertos
-
-0. **`descubrimiento.py` está a medias y sin probar.** La mitad de Wayback está escrita pero nunca se ejecutó ni tiene pruebas; la mitad de gob.mx no existe. Es el único archivo del repo en ese estado y es lo primero que hay que cerrar.
 
 1. **gob.mx solo se deja leer con navegador VISIBLE.** Headless no pasa el reto anti-bot ni con espera de 50 s ni con parches anti-detección; headful pasa en 1.7 s. La ventana se puede mandar fuera de pantalla, pero **el pipeline no puede correr en un servidor sin escritorio**. Si algún día se mueve a uno, esto se rompe y hay que volver a Wayback.
 2. **Hay una atribución que sabemos que está mal y no se parchó.** El turno `PREGUNTA: No lo interrumpas cuando…` quedó atribuido a Hans Salazar como `propagada`. Es alguien del salón regañando a otro, no Hans. La heurística de interjecciones no lo agarra porque es un solo turno con respuesta antes y después, no una racha. **No se metió un caso especial a propósito** (`CLAUDE.md`: no parchar para que un caso raro deje de fallar). Es la clase de error que la parada obligatoria de la fase 6 existe para encontrar, y es evidencia de que la propagación hacia adelante tiene un piso de error irreducible sin juicio humano.
@@ -323,6 +360,8 @@ ctx = nav.new_context(locale="es-MX", user_agent=UA,
 10. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un `DataFrame` de pandas 3.0.1 y pasó, pero no se ha corrido nada que combine pandas 3.0 con `sentence-transformers`. Si algo truena raro en las fases 8 o 12, sospechar de aquí.
 11. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`. Anotado ahora porque en la fase 12 se va a ver como un warning ignorable y no lo es.
 12. **La cobertura sigue siendo de cinco conferencias.** Una de 2024, una de 2025 y tres de 2026. Suficiente para haber encontrado cuatro defectos reales, insuficiente para afirmar que el parser aguanta 460. La parada obligatoria de la fase 6 sigue siendo el filtro de verdad.
+13. **Una docena de días hábiles sin conferencia que no son festivos obvios:** 2024-10-28, 2024-11-18, 2024-11-19, 2024-12-12, 2025-06-16, 2025-06-17, 2025-09-01, 2025-11-10, 2025-12-05, 2025-12-12 y 2026-04-17. Pueden ser giras o pueden existir bajo otro slug. Revisar en la fase 6.
+14. **La conferencia de Culiacán no tiene fecha en el slug.** `...-en-culiacan-sinaloa`. Es real y está en `urls.jsonl` con `conferencia_id: null`. La fase 5 tiene que sacarle la fecha del contenido, y de paso confirmar si hay más conferencias fuera de Palacio Nacional con este patrón.
 
 ## Cómo retomar
 
