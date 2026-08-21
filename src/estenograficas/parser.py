@@ -43,6 +43,22 @@ _VIDEO = re.compile(
 _VIDEO_ABRE = re.compile(r"\(\s*INICIA\s+VIDEO\s*\)", re.IGNORECASE)
 
 
+# Espacios Unicode que el CMS mete y que rompen la detección de etiquetas.
+# Visto en 2025-07-02: `PREGUNTA:` seguida de espacio duro en vez de espacio.
+# La etiqueta no casa, el turno se funde con el anterior, y no hay error: el
+# conteo de turnos sale más bajo y nadie se entera. Uno en cinco conferencias
+# de muestra; en 460 son decenas de turnos de prensa atribuidos a la presidenta.
+_ESPACIOS_RAROS = dict.fromkeys(
+    map(ord, "              　"),
+    " ",
+)
+
+
+def normalizar_espacios(texto: str) -> str:
+    """Convierte espacios Unicode exóticos en espacio normal."""
+    return texto.translate(_ESPACIOS_RAROS)
+
+
 def quitar_videos(texto: str) -> tuple[str, int, int]:
     """Elimina los bloques de video.
 
@@ -262,9 +278,19 @@ def partir_turnos(texto: str, conferencia_id: str) -> list[Turno]:
 # donde el "de" introduce un verbo, no un medio. Sin el ancla de oración el
 # regex encuentra seis periodistas en una conferencia que tiene cuatro.
 _NOMBRE = r"[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+(?:\s+(?:de|del|la|los)\s+)?(?:\s*[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+){1,3}"
+
+# Muletillas con las que se abre la presentación. Sin esto, "Soy" queda dentro
+# del nombre ("Soy Yesenia Peralta") y "Su servidor, Carlos Pozos, de LM
+# Noticias" no se detecta en absoluto, porque el nombre no arranca la oración.
+# Las cinco formas salieron de las conferencias de 2024, 2025 y 2026.
+_MULETILLA = (
+    r"(?:(?:[Ss]oy|[Ss]u\s+servidor|[Mm]i\s+nombre\s+es|[Ll]es?\s+habla|"
+    r"[Aa]quí)\s*,?\s+)?"
+)
 _IDENTIDAD = re.compile(
     r"(?:^|(?<=[\.\!\?])\s|^\s*)"
-    r"(?P<nombre>" + _NOMBRE + r")"
+    + _MULETILLA
+    + r"(?P<nombre>" + _NOMBRE + r")"
     r"\s*,\s*(?:de|del)\s+(?:la\s+|el\s+)?"
     r"(?P<medio>[^\.\!\?\n]{2,70}?)"
     r"\s*[\.\!\?]",
@@ -450,7 +476,7 @@ class Conferencia:
 
 def parsear(texto: str, conferencia_id: str) -> Conferencia:
     """Parsea una conferencia completa. Sin red, sin modelo, sin estado."""
-    limpio, n_videos, huerfanos = quitar_videos(texto)
+    limpio, n_videos, huerfanos = quitar_videos(normalizar_espacios(texto))
     limpio, tenia_fin = quitar_fin_de_documento(limpio)
     encabezado, cuerpo = separar_encabezado(limpio)
     turnos = partir_turnos(cuerpo, conferencia_id)
@@ -466,9 +492,61 @@ def parsear(texto: str, conferencia_id: str) -> Conferencia:
     )
 
 
+def texto_desde_html(html: str) -> str:
+    """Extrae el texto de la versión estenográfica de la página de gob.mx.
+
+    La estructura es estable: `h1` con el título, `h2` con el subtítulo, una
+    `section` con "Presidencia de la República | fecha", el caption de la
+    imagen principal, y `div.article-body` con un `<p>` por párrafo, donde la
+    etiqueta de hablante va en `<strong>`.
+
+    El encabezado se conserva a propósito en vez de tirarlo aquí: separarlo es
+    trabajo de `separar_encabezado`, y así el parser ve la misma entrada venga
+    de HTML o del .txt de un fixture viejo.
+    """
+    from bs4 import BeautifulSoup
+
+    sopa = BeautifulSoup(html, "lxml")
+
+    partes: list[str] = []
+    for sel in ("h1", "h2"):
+        el = sopa.find(sel)
+        if el:
+            partes.append(el.get_text(" ", strip=True))
+
+    cuerpo = sopa.find(class_="article-body")
+    if cuerpo is None:
+        raise ValueError("no se encontró div.article-body; el formato cambió")
+
+    # La línea de "Presidencia de la República | fecha" vive en una section
+    # anterior al cuerpo. Se busca acotado para no barrer el pie de página.
+    for s in sopa.find_all("section"):
+        t = s.get_text(" ", strip=True)
+        if t.startswith("Presidencia de la Rep") and len(t) < 120:
+            partes.append(t)
+            break
+
+    img = sopa.find(class_="imagen-principal")
+    if img:
+        partes.append(img.get_text(" ", strip=True))
+
+    # Búsqueda recursiva, no solo hijos directos: en 2024 los <p> cuelgan
+    # directo de .article-body, pero desde 2025 el CMS los envuelve en uno o
+    # más <div>. Mirar solo el primer nivel devuelve la conferencia entera
+    # como un párrafo, y de ahí un solo turno y cero hilos, sin error visible.
+    for p in cuerpo.find_all("p"):
+        t = p.get_text(" ", strip=True)
+        if t:
+            partes.append(t)
+
+    return "\n\n".join(partes)
+
+
 def parsear_archivo(ruta: Path) -> Conferencia:
-    """Parsea un archivo de fixture. El id sale del nombre: 2026-08-18.txt."""
-    return parsear(ruta.read_text(encoding="utf-8"), ruta.stem)
+    """Parsea un fixture. El id sale del nombre: 2026-08-18.txt o .html."""
+    crudo = ruta.read_text(encoding="utf-8", errors="replace")
+    texto = texto_desde_html(crudo) if ruta.suffix.lower() in (".html", ".htm") else crudo
+    return parsear(texto, ruta.stem)
 
 
 def escribir_jsonl(registros: Iterable[Any], destino: Path) -> int:

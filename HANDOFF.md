@@ -8,12 +8,46 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Estado
 
-**Fase actual:** 2 (parser contra una conferencia) terminada. Fase 3 (parser contra varios años) no iniciada.
+**Fase actual:** 3 (parser contra varios años) terminada. Fase 4 (descubrimiento de URLs) no iniciada.
 **Última actualización:** 2026-08-21.
 **Ambiente conda:** **`votaciones_corte`**, Python 3.11.14, en `C:\Users\User\anaconda3\envs\votaciones_corte`. Aprobado por el humano el 2026-08-21 para usarse directo, sin clonar.
-**Bloqueado esperando:** confirmación para arrancar la fase 3.
+**Bloqueado esperando:** decisión sobre cómo bajar el corpus. **gob.mx bloquea a los clientes que no ejecutan JavaScript** y eso cambia el plan de las fases 4 y 5. Ver "Problemas abiertos", punto 1.
 
 ## Hecho
+
+### Parser contra varios años (fase 3)
+
+Cuatro conferencias nuevas en `fixtures/`, más la que ya estaba: **2024-11-11, 2025-07-02, 2026-02-03, 2026-08-04 y 2026-08-18**. Dos de 2026 a petición del humano, separadas medio año, porque el formato también puede cambiar dentro del mismo año. **78 pruebas, 78 pasan.**
+
+**gob.mx no se deja descargar.** Responde HTTP 200 con una página de `Challenge Validation` de 1.8 KB —JavaScript anti-bot— en vez del contenido. Se probó con cabeceras de navegador completas (User-Agent de Chrome, `Accept-Language`, `Sec-Ch-Ua`, `Sec-Fetch-*`, `--compressed`) y responde lo mismo. **Los cinco fixtures vienen de la Wayback Machine**, que sí funciona y tiene capturas de las tres temporadas. Esto no era un supuesto del plan y cambia las fases 4 y 5.
+
+**Cuatro defectos reales encontrados, ninguno parchado con caso especial:**
+
+1. **La estructura del HTML cambió en 2025.** En 2024 los `<p>` cuelgan directo de `div.article-body`; desde 2025 el CMS los envuelve en `<div>`. Mi extractor miraba solo hijos directos, así que **tres de las cuatro conferencias se parseaban como UN turno y cero hilos, sin lanzar ningún error**. Es el modo de falla más peligroso del proyecto: silencioso y con salida bien formada. Corregido con búsqueda recursiva.
+2. **Espacio duro tras la etiqueta.** En 2025-07-02 hay un `PREGUNTA:` seguido de `\xa0`. La etiqueta no casa y **el turno de prensa se funde con el de la presidenta**, quedando atribuido a ella. Uno en cinco conferencias; extrapolado, decenas en el corpus. Se normalizan los espacios Unicode antes de segmentar.
+3. **Muletillas de presentación.** `Soy Aissa García, de Telesur` producía el nombre "Soy Aissa García". Peor: `Su servidor, Carlos Pozos, de LM Noticias` no se detectaba en absoluto porque el nombre no arranca la oración, y **se perdía el hilo entero de ese periodista**. Con las muletillas contempladas, 2026-02-03 pasó de 4 a 5 hilos.
+4. **Descarga en gzip.** Una de las cuatro capturas venía comprimida y curl la guardó cruda; 49 KB de binario que el parser habría rechazado. Trivial de arreglar aquí, pero la fase 5 tiene que manejarlo.
+
+**Resultado tras las correcciones:**
+
+| conferencia | turnos | hilos | prensa | video | apartes |
+|---|---|---|---|---|---|
+| 2024-11-11 | 73 | 5 | 30 | 0 | 6 |
+| 2025-07-02 | 182 | 5 | 71 | 0 | 22 |
+| 2026-02-03 | 195 | 5 | 79 | 0 | 23 |
+| 2026-08-04 | 167 | 4 | 75 | 2 | 27 |
+| 2026-08-18 | 159 | 4 | 65 | 3 | 32 |
+
+**Diagnóstico que pedía la fase 3, qué etiquetas aparecen en unas y no en otras:**
+
+- Compartidas por las cinco: solo dos, `PREGUNTA` (320 en total) y `PRESIDENTA DE MÉXICO, CLAUDIA SHEINBAUM PARDO` (356).
+- **`INTERVENCIÓN` aparece en 2025 y 2026 pero NO en la conferencia de 2024.** 10 ocurrencias en cuatro conferencias. Puede ser que la práctica de transcripción cambiara, o simple azar de la muestra; con una sola conferencia de 2024 no se puede afirmar. Vale la pena mirarlo en la fase 6.
+- Las otras 40 etiquetas son `CARGO, NOMBRE` de funcionarios y cambian con quién acompaña a la presidenta ese día. No son cambio de formato.
+- Una etiqueta **sin coma** y que no es ruido conocido: `GOBERNADORA INTERINA DE SINALOA YERALDINE BONILLA VALVERDE` (2026-08-04). Cargo y nombre sin coma de por medio, así que `rsplit(",", 1)` no los separa. Un caso en cinco conferencias; el diagnóstico de la fase 6 dirá si es sistemático.
+- Cero contaminación de video en las cinco. El cierre `—000—` está en las cinco.
+
+**Periodistas identificados:** 5, 5, 5, 4 y 4 respectivamente. Nancy Flores (Contralínea) aparece en febrero y en agosto de 2026 escrita igual en las dos, pero eso es suerte del muestreo y no evidencia contra la necesidad de la fase 7.
+
 
 ### Parser contra una conferencia (fase 2)
 
@@ -153,7 +187,14 @@ El humano dijo el 2026-08-21 que todavía no le queda claro en qué consiste su 
 
 ## Siguiente paso concreto
 
-**Fase 3: parser contra varios años.** Bajar a mano tres o cuatro conferencias sueltas —una de finales de 2024, una de 2025 y una de 2026 distinta a la que ya está—, guardarlas en `fixtures/` y correr el parser sobre ellas. El formato cambia con el tiempo y todo lo verificado hasta hoy vale para un solo archivo de 2026. Diagnóstico: qué etiquetas aparecen en unas y no en otras, y si las trampas de `CLAUDE.md` siguen siendo ciertas en 2024.
+**Decidir cómo se baja el corpus, antes de tocar la fase 4.** gob.mx bloquea a curl y a cualquier cliente sin JavaScript. Tres caminos, y la decisión es del humano porque tienen costos distintos:
+
+1. **Wayback Machine para todo.** Ya está probado y funciona; la API CDX permite listar todas las capturas de `version-estenografica-conferencia-de-prensa-*` por año, lo que además **resuelve la fase 4 sin recorrer el archivo paginado de gob.mx**. Riesgo: la cobertura no es completa y hay que medir cuánto falta antes de comprometerse. `CLAUDE.md` ya advertía de no asumir cobertura total.
+2. **Navegador automatizado** (Playwright) contra gob.mx. Ejecuta el JavaScript y pasa el reto. Costo: dependencia pesada nueva, mucho más lento que un request, y hay que discutir si es apropiado dar la vuelta a un control anti-bot de un sitio de gobierno.
+3. **Mixto:** Wayback como fuente principal, gob.mx con navegador solo para los huecos que Wayback no cubra.
+
+Recomendación: empezar por **medir la cobertura de Wayback** —un conteo por mes desde octubre de 2024— y decidir con ese número a la vista. Eso es barato y es lo que la fase 4 pedía como diagnóstico de todos modos.
+
 
 ## Decisiones tomadas
 
@@ -184,20 +225,26 @@ El humano dijo el 2026-08-21 que todavía no le queda claro en qué consiste su 
 | El ruido se filtra por patrón de cortesía, no por longitud | `¿No se le censura?` tiene 18 caracteres y es una pregunta real | 2 |
 | Se marcan como ruido los agradecimientos, no solo los saludos | `CLAUDE.md` dice "saludos"; un "Muchas gracias, Presidenta" es la misma cortesía y tampoco es una pregunta. Extensión menor, anotada por si se quiere revertir | 2 |
 | Solo raya y semirraya delimitan apartes, no el guion ASCII | El guion se usa en rangos y compuestos y generaba falsos apartes | 2 |
+| Los fixtures de otros años se guardan como HTML crudo, no como .txt | Es lo que la fase 5 va a producir; guardar texto ya extraído oculta los cambios de estructura del CMS, que fue justo lo que se encontró | 3 |
+| La extracción de HTML busca los <p> recursivamente | En 2024 cuelgan de .article-body y desde 2025 van dentro de <div>; mirar solo el primer nivel da un turno y cero hilos sin error | 3 |
+| Los espacios Unicode se normalizan antes de segmentar | Un espacio duro tras la etiqueta funde el turno con el anterior en silencio | 3 |
+| Se contemplan muletillas de presentación (Soy, Su servidor, Mi nombre es) | Sin ellas se pierde el hilo completo de quien se presenta así, y el nombre sale con el verbo pegado | 3 |
+| Las pruebas multianio afirman invariantes, no conteos | Los conteos de esas cuatro no se cuadraron a mano; una prueba que afirme un número salido del propio parser no prueba nada | 3 |
 
 ## Problemas abiertos
 
-1. **Hay una atribución que sabemos que está mal y no se parchó.** El turno `PREGUNTA: No lo interrumpas cuando…` quedó atribuido a Hans Salazar como `propagada`. Es alguien del salón regañando a otro, no Hans. La heurística de interjecciones no lo agarra porque es un solo turno con respuesta antes y después, no una racha. **No se metió un caso especial a propósito** (`CLAUDE.md`: no parchar para que un caso raro deje de fallar). Es la clase de error que la parada obligatoria de la fase 6 existe para encontrar, y es evidencia de que la propagación hacia adelante tiene un piso de error irreducible sin juicio humano.
-2. **El hilo de Dalila Escobar tiene 62 turnos y 31 preguntas, muy por encima de los otros tres.** Puede ser real —ella misma dice "el último, tercer tema"— o puede ser que otro periodista habló sin presentarse y quedó absorbido en su hilo. No se puede distinguir sin leer. Revisar en la fase 6.
-3. **Tres turnos `INTERVENCIÓN` quedan con `texto` vacío** porque todo su contenido era un aparte (`—25—`, `—36 [por ciento] del '24 al…—`). Es correcto según el contrato, pero un texto vacío es fácil de confundir con un error de parseo cuando se vean 460 conferencias.
-4. **El fixture empieza con `ersión estenográfica`**, sin la V inicial. Es un defecto del texto de origen, no del parser. Si aparece en más archivos, la extracción del título en la fase 6 tiene que tolerarlo.
-5. **No se verificó que el otro proyecto que usa `votaciones_corte` siga funcionando** después de la instalación. El dry-run no mostró downgrades, que es evidencia buena pero no es haberlo corrido. Si `votaciones_corte` empieza a fallar en su proyecto original, empezar por aquí.
-6. **`environment.yml` lista de más.** Como `votaciones_corte` es compartido, el export trae paquetes del otro proyecto. Reconstruirlo en otra máquina da un ambiente que funciona pero más gordo que el mínimo, y con torch CPU. Si algún día importa, se recorta a mano.
-7. **Sin estimación de costo para la fase 11.** ~10 mil preguntas × 3 corridas ≈ 30 mil llamadas. Se estima antes de la fase 9, no al llegar a la 11.
-8. **La compensación del instructivo de codificación no está resuelta.** Ejemplos trabajados por el agente hacen la tarea posible pero anclan al humano a la lectura del agente. La alternativa es que el humano codifique 10 en frío primero y de ahí salga el instructivo. Se decide al llegar a la fase 9.
-9. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un `DataFrame` de pandas 3.0.1 y pasó, pero no se ha corrido nada que combine pandas 3.0 con `sentence-transformers`. Si algo truena raro en las fases 8 o 12, sospechar de aquí.
-10. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`. Anotado ahora porque en la fase 12 se va a ver como un warning ignorable y no lo es.
-11. **La cobertura del fixture es de una sola conferencia y de 2026.** Todo lo verificado hasta ahora —incluida la trampa de los videos y `INTERVENCIÓN:`— vale para ese archivo. La fase 3 existe para ver qué se rompe en 2024 y 2025.
+1. **gob.mx bloquea la descarga automatizada.** Responde 200 con una página de reto anti-bot en vez del contenido, aun con cabeceras de navegador completas. Las fases 4 y 5 estaban escritas suponiendo que se podía recorrer el sitio con requests; ese supuesto es falso. Ver "Siguiente paso concreto" para las tres opciones. **Este es el bloqueador real del proyecto ahora mismo.**
+2. **Hay una atribución que sabemos que está mal y no se parchó.** El turno `PREGUNTA: No lo interrumpas cuando…` quedó atribuido a Hans Salazar como `propagada`. Es alguien del salón regañando a otro, no Hans. La heurística de interjecciones no lo agarra porque es un solo turno con respuesta antes y después, no una racha. **No se metió un caso especial a propósito** (`CLAUDE.md`: no parchar para que un caso raro deje de fallar). Es la clase de error que la parada obligatoria de la fase 6 existe para encontrar, y es evidencia de que la propagación hacia adelante tiene un piso de error irreducible sin juicio humano.
+3. **El hilo de Dalila Escobar tiene 62 turnos y 31 preguntas, muy por encima de los otros tres.** Puede ser real —ella misma dice "el último, tercer tema"— o puede ser que otro periodista habló sin presentarse y quedó absorbido en su hilo. No se puede distinguir sin leer. Revisar en la fase 6.
+4. **Tres turnos `INTERVENCIÓN` quedan con `texto` vacío** porque todo su contenido era un aparte (`—25—`, `—36 [por ciento] del '24 al…—`). Es correcto según el contrato, pero un texto vacío es fácil de confundir con un error de parseo cuando se vean 460 conferencias.
+5. **El fixture empieza con `ersión estenográfica`**, sin la V inicial. Es un defecto del texto de origen, no del parser. Si aparece en más archivos, la extracción del título en la fase 6 tiene que tolerarlo.
+6. **No se verificó que el otro proyecto que usa `votaciones_corte` siga funcionando** después de la instalación. El dry-run no mostró downgrades, que es evidencia buena pero no es haberlo corrido. Si `votaciones_corte` empieza a fallar en su proyecto original, empezar por aquí.
+7. **`environment.yml` lista de más.** Como `votaciones_corte` es compartido, el export trae paquetes del otro proyecto. Reconstruirlo en otra máquina da un ambiente que funciona pero más gordo que el mínimo, y con torch CPU. Si algún día importa, se recorta a mano.
+8. **Sin estimación de costo para la fase 11.** ~10 mil preguntas × 3 corridas ≈ 30 mil llamadas. Se estima antes de la fase 9, no al llegar a la 11.
+9. **La compensación del instructivo de codificación no está resuelta.** Ejemplos trabajados por el agente hacen la tarea posible pero anclan al humano a la lectura del agente. La alternativa es que el humano codifique 10 en frío primero y de ahí salga el instructivo. Se decide al llegar a la fase 9.
+10. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un `DataFrame` de pandas 3.0.1 y pasó, pero no se ha corrido nada que combine pandas 3.0 con `sentence-transformers`. Si algo truena raro en las fases 8 o 12, sospechar de aquí.
+11. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`. Anotado ahora porque en la fase 12 se va a ver como un warning ignorable y no lo es.
+12. **La cobertura sigue siendo de cinco conferencias.** Una de 2024, una de 2025 y tres de 2026. Suficiente para haber encontrado cuatro defectos reales, insuficiente para afirmar que el parser aguanta 460. La parada obligatoria de la fase 6 sigue siendo el filtro de verdad.
 
 ## Cómo retomar
 
