@@ -36,11 +36,36 @@ Atribucion = Literal["declarada", "propagada", "incierta"]
 # Un bloque de video abre con (INICIA VIDEO) y cierra con (FINALIZA VIDEO).
 # Entre los dos hay etiquetas como VOZ MUJER: o DERECHOHABIENTE, NOMBRE: que
 # son testimonios grabados, no diálogo de la conferencia.
-_VIDEO = re.compile(
-    r"\(\s*INICIA\s+VIDEO\s*\).*?\(\s*(?:FINALIZA|TERMINA)\s+VIDEO\s*\)",
-    re.IGNORECASE | re.DOTALL,
+# Un bloque abre y cierra con un paréntesis, pero las formas son muchas más que
+# `(INICIA VIDEO)`. Contadas sobre las 460 conferencias: 431 `(INICIA VIDEO)`
+# pero también ~160 `(PROYECCIÓN DE VIDEO ...)`, con la sección entre comillas
+# pegada dentro del mismo paréntesis, más `(INICIA AUDIO)`. Y los cierres son
+# `FINALIZA`, `FINALIZAN`, `CONCLUYE` y `TERMINA`. Con solo la forma canónica
+# quedaban 475 cierres contra 431 aperturas: 44 bloques sin abrir, cuyo
+# contenido sobrevivía a la limpieza.
+#
+# `VIDEO\b` con frontera de palabra a propósito: `(ENLACE VIDEOLLAMADA)`
+# aparece 818 veces y NO es un video proyectado, es alguien participando a
+# distancia, que sí forma parte del diálogo de la conferencia.
+# `PROYECCIÓN DE VIDEO` NO va aquí, aunque parezca una apertura. Se probó:
+# suele ser una marca suelta que anuncia que se proyectó algo, sin cierre que
+# le corresponda, así que tratarla como apertura hace que el bloque se coma
+# todo hasta el siguiente `(FINALIZA VIDEO)`, que puede estar mucho más
+# adelante. Medido sobre las 460: **borraba 787 turnos, 239 de ellos de
+# prensa**. Las apariciones de `VOZ MUJER` que sobreviven cerca de esas marcas
+# son un problema menor que perder preguntas reales.
+_ABRE_V = (
+    r"\(\s*(?:INICIA|INICIAN|COMIENZA|EMPIEZA)"
+    r"[^)]{0,60}?(?:V[IÍ]DEOS?|AUDIOS?)\b[^)]{0,60}\)"
 )
-_VIDEO_ABRE = re.compile(r"\(\s*INICIA\s+VIDEO\s*\)", re.IGNORECASE)
+_CIERRA_V = (
+    r"\(\s*(?:FINALIZA|FINALIZAN|CONCLUYE|CONCLUYEN|TERMINA|TERMINAN)"
+    r"[^)]{0,60}?(?:V[IÍ]DEOS?|AUDIOS?)\b[^)]{0,60}\)"
+)
+_VIDEO = re.compile(
+    _ABRE_V + r".*?" + _CIERRA_V, re.IGNORECASE | re.DOTALL
+)
+_VIDEO_ABRE = re.compile(_ABRE_V, re.IGNORECASE)
 
 
 # Espacios Unicode que el CMS mete y que rompen la detección de etiquetas.
@@ -562,12 +587,23 @@ def texto_desde_html(html: str) -> str:
     if img:
         partes.append(img.get_text(" ", strip=True))
 
+    # Un <br> sí separa palabras; se vuelve espacio antes de unir.
+    for br in cuerpo.find_all("br"):
+        br.replace_with(" ")
+
     # Búsqueda recursiva, no solo hijos directos: en 2024 los <p> cuelgan
     # directo de .article-body, pero desde 2025 el CMS los envuelve en uno o
     # más <div>. Mirar solo el primer nivel devuelve la conferencia entera
     # como un párrafo, y de ahí un solo turno y cero hilos, sin error visible.
+    #
+    # `get_text("")` sin separador, no `get_text(" ")`. Dentro de un párrafo
+    # todo es texto en línea, y meter un espacio entre fragmentos parte las
+    # palabras que envuelven cursivas: `el periódico <em>La Jornada</em>,`
+    # salía como `el periódico La Jornada , donde`. Eran 616 espacios espurios
+    # en 5,844 turnos, justo pegados al nombre del medio, que es lo que la
+    # fase 7 tiene que agrupar.
     for p in cuerpo.find_all("p"):
-        t = p.get_text(" ", strip=True)
+        t = " ".join(p.get_text("").split())
         if t:
             partes.append(t)
 

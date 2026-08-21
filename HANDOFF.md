@@ -8,13 +8,79 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Estado
 
-**Fase actual:** 5 (descarga) terminada. **Sigue la fase 6, que es PARADA OBLIGATORIA**: el humano tiene que revisar el conjunto de etiquetas antes de que el parseo masivo se dé por bueno.
+**Fase actual:** 6 (parseo masivo) **CORRIDA, en PARADA OBLIGATORIA**. El corpus está parseado y los tres archivos intermedios escritos, pero **nada sigue hasta que el humano revise la lista de etiquetas**. Hay 7 hallazgos concretos esperando su decisión, en "Hecho".
 **Última actualización:** 2026-08-21, cerrando la sesión.
 **Ambiente conda:** **`votaciones_corte`**, Python 3.11.14, en `C:\Users\User\anaconda3\envs\votaciones_corte`. Aprobado por el humano el 2026-08-21 para usarse directo, sin clonar.
-**Bloqueado esperando:** que el humano **respalde `data/raw/` fuera del repo**. Son 460 conferencias, 75 MB, y no están en git. `CLAUDE.md` exige el respaldo antes de que empiece cualquier etapa que las consuma, y la fase 6 las consume.
+**Bloqueado esperando:** (a) que el humano revise el diagnóstico de etiquetas de la fase 6 y decida sobre los 7 puntos; (b) que **respalde `data/raw/` fuera del repo** —460 archivos, 75 MB, no están en git—.
 
 
 ## Hecho
+
+### Parseo masivo (fase 6) — CORRIDO. **ESPERANDO REVISIÓN DEL HUMANO.**
+
+`src/estenograficas/parseo.py`. Se corre con `python -m estenograficas.parseo`. **460 conferencias parseadas, 0 rechazadas.**
+
+| archivo | renglones |
+|---|---|
+| `data/interim/turnos.jsonl` | 64,726 |
+| `data/interim/hilos.jsonl` | 2,149 |
+| `data/interim/conferencias.jsonl` | 460 |
+
+Turnos de prensa: 27,278. **Preguntas útiles, sin ruido: 22,307.** Ese es el tamaño real del universo a clasificar.
+
+Nota sobre idempotencia: esta etapa **reescribe los tres archivos en cada corrida** en vez de ir agregando. Parsear las 460 toma un minuto, así que reanudar no ahorra nada, y agregar sobre un archivo viejo dejaría renglones de una versión anterior del parser mezclados con los nuevos. Correrla dos veces da el mismo resultado, que es lo que pide la regla dura 2.
+
+#### El arreglo de videos que hubo que revertir
+
+Al ver 86 `VOZ MUJER` sobrevivientes conté los marcadores reales del corpus: 431 `(INICIA VIDEO)` contra 475 cierres, más ~160 `(PROYECCIÓN DE VIDEO …)`. Parecía obvio que `PROYECCIÓN DE VIDEO` era una apertura y la agregué.
+
+**Lo medí antes de darlo por bueno y estaba mal: borraba 787 turnos, 239 de ellos de prensa.** `(PROYECCIÓN DE VIDEO)` suele ser una marca suelta sin cierre propio, así que el bloque se comía todo hasta el siguiente `(FINALIZA VIDEO)`, que puede estar mucho más adelante. Revertido, con el porqué escrito en el código para que nadie lo reintente.
+
+Lo que sí quedó: los cierres ahora reconocen `FINALIZA`, `FINALIZAN`, `CONCLUYE` y `TERMINA`, y `AUDIO` además de `VIDEO`. 438 bloques quitados contra 431 antes, con un costo de 2 turnos de prensa que estaban dentro de bloques de video.
+
+#### Diagnóstico obligatorio: lo que tienes que revisar
+
+**986 etiquetas de hablante únicas. 433 aparecen una sola vez.** La mayoría son funcionarios y beneficiarios reales con el cargo escrito distinto cada día, pero ahí adentro hay errores.
+
+**1. `PREGUNTA (VIDEOLLAMADA)`, 36 turnos.** Es prensa preguntando por videollamada y el parser la cuenta como **funcionario**, porque no está en la lista de etiquetas de prensa. Es el mismo tipo de error que `INTERLOCUTOR` y hay que arreglarlo. Recomendación: tratar cualquier etiqueta que empiece con `PREGUNTA` como prensa.
+
+**2. Variantes de la etiqueta de la presidenta, siete formas para la misma persona:**
+
+| turnos | etiqueta |
+|---|---|
+| 27,687 | `PRESIDENTA DE MÉXICO, CLAUDIA SHEINBAUM PARDO` |
+| 815 | `PRESIDENTA CLAUDIA SHEINBAUM PARDO` |
+| 12 | `PRESIDENTA DE MÉXICO CLAUDIA SHEINBAUM PARDO` |
+| 3 | `RESIDENTA DE MÉXICO, CLAUDIA SHEINBAUM PARDO` (sin la P) |
+| 1 | `PRESIDENTA DE MÉXICO, CLAUDIA SHEINBAUM PADO` (PADO) |
+| 1 | `CANDIDATA A LA PRESIDENCIA DE MÉXICO, CLAUDIA SHEINBAUM PARDO` |
+| 1 | `CLAUDIA SHEINBAUM PARDO` |
+
+Las tres últimas son erratas de la transcripción, no hablantes distintos.
+
+**3. Variantes del ruido de sala que no están cubiertas:** `INTERVENCIÓN HOMBRE` (12), `INTERVENCIÓN MUJER` (7), `INTERVENCIÓN MUJER (ENLACE VIDEOLLAMADA)` (8). Son la misma cosa que `INTERVENCIÓN`, que sí está cubierta.
+
+**4. Contaminación de video que sobrevive: 269 turnos en 62 conferencias.** `VOZ MUJER` (68), `VOZ HOMBRE` (61), `VOZ DE MUJER` (10), `VOCES A CORO` (6), `NIÑA` (12), `NIÑO JULIÁN` (7), más los `BENEFICIARIA DEL PROGRAMA…`. Todas caen como `anonimo`, así que **no ensucian el conteo de prensa**, pero sí están en el flujo de turnos. Vienen de los bloques que abren con `PROYECCIÓN DE VIDEO` y no se pueden quitar sin el destrozo descrito arriba. **Decisión tuya:** filtrarlos por etiqueta en vez de por bloque, o dejarlos como `anonimo` y excluirlos en el análisis.
+
+**5. `(ENLACE VIDEOLLAMADA)` aparece 818 veces y NO lo trato como video.** Es gente participando a distancia —gobernadoras, beneficiarios— que sí habla en la conferencia. Confírmame que es la lectura correcta.
+
+**6. Tema del día: 49% (224 de 460).** Y la calidad de lo que extrae el regex es despareja. Bien: `salud`, `seguridad`, `el informe quinquenal de salud`. Mal: `casa llena`, `tres temas`, `estos cuatro temas y luego pasamos a las preguntas`. **El campo sirve para agrupar a grandes rasgos pero no está listo para cruzarlo en el análisis final**; probablemente necesite el modelo sobre el fragmento de apertura, que es un uso acotado y legítimo según la regla dura 4.
+
+**7. Siete conferencias sin ningún hilo**, ahora con detalle:
+
+| fecha | turnos | de prensa |
+|---|---|---|
+| 2025-10-03 | 18 | **0** |
+| 2026-05-29 | 31 | 2 |
+| 2025-05-21 | 94 | 4 |
+| 2024-12-18 | 88 | 12 |
+| 2026-05-20 | 76 | 19 |
+| 2025-04-02 | 69 | 29 |
+| 2025-04-07 | 94 | 32 |
+
+La de 2025-10-03 con 0 turnos de prensa probablemente no es una mañanera. Las de abajo sí tienen prensa y ningún periodista se autopresentó de forma reconocible: ahí hay hilos que se están perdiendo.
+
+**Los 10 turnos al azar del diagnóstico salieron limpios**, con etiqueta y tipo correctos, incluido un `VOZ HOMBRE` marcado `anonimo`. La salida completa del diagnóstico se regenera corriendo la etapa.
 
 ### Descarga del corpus (fase 5) — TERMINADA
 
@@ -323,23 +389,13 @@ El humano dijo el 2026-08-21 que todavía no le queda claro en qué consiste su 
 
 ## Siguiente paso concreto
 
-**Primero, antes de cualquier código: respaldar `data/raw/` fuera del repo.** 460 archivos, 75 MB, no están en git, y volver a bajarlos cuesta 15 minutos de navegador y depende de que gob.mx siga sirviendo. `CLAUDE.md` lo exige antes de que empiece cualquier etapa que los consuma.
+**Esperar la revisión del humano sobre los 7 puntos del diagnóstico de la fase 6.** No arrancar la fase 7 sin eso: `PROMPT.md` lo marca como parada obligatoria y esta sesión ya demostró dos veces por qué (`INTERLOCUTOR`, 421 turnos; `PREGUNTA (VIDEOLLAMADA)`, 36 más).
 
-**Después, fase 6: parseo masivo. ES PARADA OBLIGATORIA.**
+Cuando dé el visto bueno, el orden es:
 
-1. Escribir la etapa que corre el parser sobre las 460 y escribe `data/interim/turnos.jsonl`, `data/interim/hilos.jsonl` y `data/interim/conferencias.jsonl` con el `tema_dia`, todo con checkpoint y con archivo de rechazos.
-2. **Producir el diagnóstico obligatorio:** el conjunto completo de etiquetas de hablante únicas ordenadas por frecuencia, más 10 turnos al azar con su etiqueta y sus primeros 200 caracteres, más la distribución de temas del día.
-3. **Detenerse y esperar al humano.** No seguir a la fase 7 sin su visto bueno. Una etiqueta que aparece tres veces en 460 conferencias casi siempre es un error de parseo, y ya se comprobó en esta sesión que ese tipo de error no da síntomas: `INTERLOCUTOR` costó 421 turnos de prensa mal clasificados sin que nada fallara.
-
-Lo que ya se sabe que hay que revisar en esa parada, todo detectado en esta sesión:
-
-- Las **7 conferencias sin ningún hilo**: `2024-12-18`, `2025-04-02`, `2025-04-07`, `2025-05-21`, `2025-10-03`, `2026-05-20`, `2026-05-29`.
-- Las **tres variantes de la etiqueta de la presidenta**, que hay que unificar.
-- Las etiquetas de **cargo sin coma** (`GOBERNADORA INTERINA DE SINALOA YERALDINE BONILLA VALVERDE`), que `rsplit` no separa.
-- Si `INTERVENCIÓN` de verdad no existe en 2024 o fue azar de la muestra.
-- La **docena de días hábiles sin conferencia** que no son festivos obvios.
-- **Rehacer la estimación de costo de la fase 11 sobre 27,280 turnos de prensa**, no sobre los 10 mil que supone `CLAUDE.md`.
-
+1. Aplicar las correcciones de etiquetas que apruebe y **volver a correr `python -m estenograficas.parseo`**, que reescribe los tres archivos.
+2. **Respaldar `data/raw/` fuera del repo** si no lo ha hecho.
+3. Fase 7, identidad: regex sobre los primeros 300 caracteres, el modelo solo sobre lo que el regex no resuelva, y después canonicalización con embeddings más clustering. Los clusters dudosos se le muestran para que los apruebe.
 
 ## Decisiones tomadas
 
@@ -386,6 +442,11 @@ Lo que ya se sabe que hay que revisar en esa parada, todo detectado en esta sesi
 | La fecha del contenido manda sobre la del slug | Recuperó dos conferencias que estaban listadas bajo una fecha equivocada y que se habrían dado por perdidas | 5 |
 | `INTERLOCUTOR` e `INTERLOCUTORA` son prensa | 421 turnos en octubre de 2024. Contarlos como funcionarios convierte preguntas de periodistas en declaraciones de gobierno | 5 |
 | La etiqueta se orienta por dónde está el cargo, no por la posición | El orden se invierte según el año: 116 `CARGO, NOMBRE` contra 60 `NOMBRE, CARGO` en las primeras 90 conferencias | 5 |
+| `get_text("")` sin separador al extraer párrafos | Con separador, `el periódico <em>La Jornada</em>,` salía `La Jornada , donde`. 616 espacios espurios en 5,844 turnos, pegados justo al nombre del medio | 6 |
+| `PROYECCIÓN DE VIDEO` NO se trata como apertura de bloque | Se probó y borraba 787 turnos, 239 de prensa: es una marca suelta sin cierre, y el bloque se comía todo hasta el siguiente `(FINALIZA VIDEO)` | 6 |
+| Los cierres de video aceptan FINALIZA, FINALIZAN, CONCLUYE, TERMINA y AUDIO | 475 cierres contra 431 aperturas canónicas; faltaban formas | 6 |
+| La fase 6 reescribe los tres JSONL en cada corrida | Parsear las 460 toma un minuto; agregar dejaría renglones de una versión vieja del parser mezclados con los nuevos | 6 |
+| El tema del día va nulo cuando no se anuncia | 51% de las conferencias no anuncian tema. Nulo antes que inventado | 6 |
 
 ## Problemas abiertos
 
@@ -403,6 +464,9 @@ Lo que ya se sabe que hay que revisar en esa parada, todo detectado en esta sesi
 15. **`data/raw/` no está respaldado.** 460 archivos, 75 MB, fuera de git. Es el activo caro y bloquea la fase 6.
 16. **Siete conferencias sin ningún hilo:** `2024-12-18`, `2025-04-02`, `2025-04-07`, `2025-05-21`, `2025-10-03`, `2026-05-20`, `2026-05-29`. No truenan; nadie se autopresenta de forma reconocible. Revisar en la fase 6.
 17. **Tres variantes de la etiqueta de la presidenta** conviven en el corpus y hay que unificarlas.
+19. **`PREGUNTA (VIDEOLLAMADA)` se cuenta como funcionario:** 36 turnos de prensa mal clasificados. Pendiente de que el humano apruebe tratar cualquier etiqueta que empiece con `PREGUNTA` como prensa.
+20. **269 turnos de contaminación de video sobreviven** en 62 conferencias. Caen como `anonimo`, así que no ensucian el conteo de prensa, pero están en el flujo. Pendiente decidir si se filtran por etiqueta.
+21. **El `tema_dia` solo cubre el 49% y su calidad es despareja.** Sirve para agrupar a grandes rasgos, no para cruzarlo en el análisis final tal como está.
 18. **El corpus tiene 27,280 turnos de prensa, no ~10 mil.** `CLAUDE.md` supone el orden de 10 mil; la estimación de costo de la fase 11 hay que rehacerla.
 12. **La cobertura sigue siendo de cinco conferencias.** Una de 2024, una de 2025 y tres de 2026. Suficiente para haber encontrado cuatro defectos reales, insuficiente para afirmar que el parser aguanta 460. La parada obligatoria de la fase 6 sigue siendo el filtro de verdad.
 13. **Una docena de días hábiles sin conferencia que no son festivos obvios:** 2024-10-28, 2024-11-18, 2024-11-19, 2024-12-12, 2025-06-16, 2025-06-17, 2025-09-01, 2025-11-10, 2025-12-05, 2025-12-12 y 2026-04-17. Pueden ser giras o pueden existir bajo otro slug. Revisar en la fase 6.
