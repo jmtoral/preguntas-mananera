@@ -7,8 +7,6 @@
 # Los builds se omitieron (--no-builds) para que sea menos fragil entre plataformas.
 # Aun asi torch quedo en version CPU y varios paquetes vienen de pip, asi que en
 # otra maquina puede resolver distinto. Ver HANDOFF.md.
-
-name: votaciones_corte
 channels:
   - defaults
 dependencies:
@@ -59,6 +57,7 @@ dependencies:
       - google-genai==1.66.0
       - google-generativeai==0.8.6
       - googleapis-common-protos==1.73.0
+      - greenlet==3.5.5
       - grpcio==1.78.0
       - grpcio-status==1.71.2
       - h11==0.16.0
@@ -87,6 +86,7 @@ dependencies:
       - pdfminer-six==20251230
       - pdfplumber==0.11.9
       - pillow==12.1.1
+      - playwright==1.62.0
       - pluggy==1.6.0
       - proto-plus==1.27.1
       - protobuf==5.29.6
@@ -95,6 +95,7 @@ dependencies:
       - pycparser==3.0
       - pydantic==2.12.5
       - pydantic-core==2.41.5
+      - pyee==13.0.1
       - pygments==2.21.0
       - pyparsing==3.3.2
       - pypdfium2==5.5.0

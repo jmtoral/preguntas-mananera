@@ -8,16 +8,47 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Estado
 
-**Fase actual:** 3 (parser contra varios años) terminada. Fase 4 (descubrimiento de URLs) no iniciada.
-**Última actualización:** 2026-08-21.
+**Fase actual:** 3 terminada. **Fase 4 a medias**, ver abajo.
+**Última actualización:** 2026-08-21, cerrando la sesión.
 **Ambiente conda:** **`votaciones_corte`**, Python 3.11.14, en `C:\Users\User\anaconda3\envs\votaciones_corte`. Aprobado por el humano el 2026-08-21 para usarse directo, sin clonar.
-**Bloqueado esperando:** aprobación para instalar **Playwright** (paquete más un Chromium de ~150 MB). La estrategia de descarga ya está decidida —mixta, Wayback más gob.mx con navegador— y la cobertura de Wayback ya está medida. Sin Playwright no se puede escribir la mitad de la fase 4 que toca gob.mx. **No se instaló nada.**
+**Bloqueado esperando:** nada. Se puede continuar directo.
+
+**Fase actual, con precisión:** la 4 está a medio hacer. Existe `src/estenograficas/descubrimiento.py` con la mitad de Wayback escrita, pero **sin pruebas, sin haberse ejecutado nunca y sin commitear a la hora de escribir esto**. Falta la mitad de gob.mx, que es la que ahora conviene que sea la principal. **No existe `data/interim/urls.jsonl`.**
 
 ## Hecho
 
+### Playwright contra gob.mx: reconocimiento (fase 4, a medias)
+
+Aprobado e instalado el 2026-08-21: `playwright` más Chromium (114.5 MB). **Funciona, pero con una condición que cambia el plan.**
+
+**Headless NO pasa el reto anti-bot. Headful sí, en 1.7 segundos.**
+
+| intento | resultado |
+|---|---|
+| curl con cabeceras de navegador completas | 1,838 bytes de `Challenge Validation` |
+| Playwright `headless=True`, espera 6 s | reto |
+| Playwright `headless=True`, espera 50 s + parches anti-detección (`navigator.webdriver`, `plugins`, `languages`, `window.chrome`) | reto |
+| **Playwright `headless=False`** | **174 KB, `article-body` presente, 65 `PREGUNTA`, sin reto, 1.7 s** |
+
+Consecuencia práctica: la descarga abre un navegador de verdad. **Se puede mandar fuera de pantalla** con `--window-position=-2400,-2400 --window-size=1280,900`, probado y funciona, pero el proceso no puede correr en un servidor sin escritorio. Si algún día se mueve a uno, esto se rompe.
+
+**La sesión aguanta.** Cinco conferencias seguidas en un mismo contexto, una por segundo: 200 en todas, entre 0.7 s y 1.7 s cada una, sin que el reto vuelva a aparecer. No hace falta reabrir el navegador por página.
+
+**El archivo paginado es mucho más chico de lo que se temía.** `https://www.gob.mx/presidencia/archivo/articulos?order=DESC&page=N`, 9 artículos por página y 4 o 5 conferencias por página. Se hizo búsqueda binaria del final:
+
+- página 1 → 17-20 de agosto de 2026
+- página 60 → 13-18 de agosto de 2025
+- página 90 → 7-10 de febrero de 2025
+- página 105 → 21-25 de octubre de 2024
+- **página 108 → 3-4 de octubre de 2024, y es la última con contenido** (109 en adelante vienen vacías)
+
+La página 108 cae justo en el inicio del sexenio. **El archivo completo se recorre en 108 páginas, unos dos minutos a un request por segundo**, y contiene del orden de 440 conferencias.
+
+**Esto invierte la estrategia.** El plan mixto se decidió cuando parecía que gob.mx era caro de recorrer. No lo es: gob.mx conviene como fuente **principal** de descubrimiento —da la URL canónica, cubre todo el sexenio y es rápido— y Wayback pasa a ser el **respaldo** para lo que gob.mx no dé o para cuando bloquee. Sigue siendo mixto, pero con los papeles al revés. La medición de Wayback no se desperdicia: es exactamente el respaldo que hace falta y ya está cuantificada.
+
 ### Medición de la cobertura de Wayback (previa a la fase 4)
 
-Pedida por el humano el 2026-08-21 para decidir cómo bajar el corpus. Decisión ya tomada: **estrategia mixta**, Wayback de base y gob.mx con navegador para los huecos.
+Pedida por el humano el 2026-08-21 para decidir cómo bajar el corpus. **Ojo al leer esta sección: sigue siendo válida como medición, pero el reparto que propone quedó invertido** por lo que se descubrió después con Playwright (sección de arriba). Wayback es el respaldo, no la base.
 
 **1,221 capturas** de la API CDX bajo el prefijo `version-estenografica-conferencia-de-prensa-de-la-presidenta-claudia-sheinbaum-pardo-del-`, entre octubre de 2024 y agosto de 2026. De ahí: 352 fechas con alguna captura, **50 fechas donde Wayback SOLO tiene capturas 4xx/5xx**, y **302 fechas utilizables**.
 
@@ -217,14 +248,23 @@ El humano dijo el 2026-08-21 que todavía no le queda claro en qué consiste su 
 
 ## Siguiente paso concreto
 
-**Estrategia decidida por el humano el 2026-08-21: mixta.** Wayback de base, gob.mx con navegador para los huecos. La medición ya está hecha (ver arriba) y dice que de gob.mx hay que bajar a lo más 192 conferencias, 123 de ellas de febrero de 2026 en adelante.
+**Terminar la fase 4.** Todo lo que hace falta ya está probado a mano; lo que falta es volverlo código con pruebas.
 
-**Pendiente antes de escribir código de la fase 4: aprobar Playwright.** Es una dependencia nueva y pesada —además del paquete, descarga un navegador Chromium completo, del orden de 150 MB— y `CLAUDE.md` prohíbe agregar dependencias pesadas sin justificarlas. La justificación es que sin ejecutar JavaScript no hay forma de leer gob.mx, y sin gob.mx falta el 39% del corpus y casi todo 2026. **No se instaló nada.**
+1. **Escribir la mitad de gob.mx en `descubrimiento.py`.** Recorrer las 108 páginas del archivo con Playwright headful, ventana fuera de pantalla, un request por segundo, checkpoint por página con el módulo `checkpoint` que ya existe. Quedarse con los `href` que contengan `conferencia-de-prensa-de-la-presidenta`. **No construir slugs**: se conservan tal como vienen, que para eso se recorre el listado.
+2. **Fusionar con Wayback.** `fusionar()` ya está escrita y da prioridad a gob.mx sobre Wayback; revisar que esa prioridad siga siendo la correcta ahora que gob.mx es la fuente principal (lo es).
+3. **Escribir `data/interim/urls.jsonl`** y correr el diagnóstico que pide la fase 4: conteo por mes y meses con huecos sospechosos. `conteo_por_mes()`, `huecos()` y `resumen()` ya están escritas.
+4. **Pruebas.** `descubrimiento.py` **no tiene ni una**. Como mínimo: `fecha_de_slug` contra los slugs con errata reales (año truncado, `%5C`, sufijo numérico), y `fusionar` contra el caso de la misma fecha en las dos fuentes.
 
-Después, la fase 4 en dos mitades:
+Fragmento que ya funciona, para no volver a descubrirlo:
 
-1. **Wayback:** ya está resuelta, la lista sale de la API CDX. Escribir `src/estenograficas/descubrimiento.py` que la consulte y escriba `data/interim/urls.jsonl` con `fuente: "wayback"`.
-2. **gob.mx:** recorrer el archivo paginado con navegador para las fechas que Wayback no cubre, y así también saber cuáles de esos 192 días de verdad no tuvieron conferencia.
+```python
+nav = p.chromium.launch(
+    headless=False,                       # headless NO pasa el reto
+    args=["--window-position=-2400,-2400", "--window-size=1280,900"],
+)
+ctx = nav.new_context(locale="es-MX", user_agent=UA,
+                      viewport={"width": 1280, "height": 900})
+```
 
 
 ## Decisiones tomadas
@@ -264,10 +304,14 @@ Después, la fase 4 en dos mitades:
 | Estrategia de descarga mixta: Wayback + gob.mx con navegador | Decisión del humano. Wayback cubre 80% hasta enero de 2026 pero solo 22% de febrero en adelante; ninguna fuente sola alcanza | previa a 4 |
 | La cobertura se mide sin `collapse` y sin filtro de statuscode | Las dos opciones subestiman: `statuscode:200` tira las capturas revisit, y `collapse=urlkey` puede devolver un 404 existiendo un 200 | previa a 4 |
 | La fecha canónica saldrá del contenido, no del slug | Confirmado que los slugs traen año truncado, backslash pegado y sufijos numéricos | previa a 4 |
+| Playwright corre headful con la ventana fuera de pantalla | Headless no pasa el reto de gob.mx en ninguna variante probada; fuera de pantalla es el compromiso que no estorba al usuario | 4 |
+| gob.mx pasa a ser la fuente principal y Wayback el respaldo | El archivo entero son 108 páginas, ~2 minutos. La estrategia mixta se decidió creyendo que era caro; no lo es. Da además la URL canónica | 4 |
 
 ## Problemas abiertos
 
-1. **gob.mx bloquea la descarga automatizada.** Responde 200 con una página de reto anti-bot en vez del contenido, aun con cabeceras de navegador completas. Estrategia decidida: mixta. Bloqueador vigente: falta aprobar Playwright (descarga un Chromium de ~150 MB) antes de poder escribir la fase 4 completa.
+0. **`descubrimiento.py` está a medias y sin probar.** La mitad de Wayback está escrita pero nunca se ejecutó ni tiene pruebas; la mitad de gob.mx no existe. Es el único archivo del repo en ese estado y es lo primero que hay que cerrar.
+
+1. **gob.mx solo se deja leer con navegador VISIBLE.** Headless no pasa el reto anti-bot ni con espera de 50 s ni con parches anti-detección; headful pasa en 1.7 s. La ventana se puede mandar fuera de pantalla, pero **el pipeline no puede correr en un servidor sin escritorio**. Si algún día se mueve a uno, esto se rompe y hay que volver a Wayback.
 2. **Hay una atribución que sabemos que está mal y no se parchó.** El turno `PREGUNTA: No lo interrumpas cuando…` quedó atribuido a Hans Salazar como `propagada`. Es alguien del salón regañando a otro, no Hans. La heurística de interjecciones no lo agarra porque es un solo turno con respuesta antes y después, no una racha. **No se metió un caso especial a propósito** (`CLAUDE.md`: no parchar para que un caso raro deje de fallar). Es la clase de error que la parada obligatoria de la fase 6 existe para encontrar, y es evidencia de que la propagación hacia adelante tiene un piso de error irreducible sin juicio humano.
 3. **El hilo de Dalila Escobar tiene 62 turnos y 31 preguntas, muy por encima de los otros tres.** Puede ser real —ella misma dice "el último, tercer tema"— o puede ser que otro periodista habló sin presentarse y quedó absorbido en su hilo. No se puede distinguir sin leer. Revisar en la fase 6.
 4. **Tres turnos `INTERVENCIÓN` quedan con `texto` vacío** porque todo su contenido era un aparte (`—25—`, `—36 [por ciento] del '24 al…—`). Es correcto según el contrato, pero un texto vacío es fácil de confundir con un error de parseo cuando se vean 460 conferencias.
