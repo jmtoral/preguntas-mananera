@@ -66,6 +66,8 @@ Estas ya costaron trabajo descubrirlas. No las vuelvas a descubrir.
 - **Los apartes entre rayas** (`—A ver, acá—`) son habla fuera de micrófono. Van en campo aparte, porque contaminan cualquier conteo de palabras por hablante.
 - **El encabezado del artículo** (título, subtítulo, caption duplicado) precede al primer turno y no debe quedar pegado a la primera intervención.
 - **Los saludos no son preguntas.** `PREGUNTA: Buenos días, Presidenta.` y `PREGUNTA: Bien.` son ruido y se filtran.
+- **`—000—` cierra el documento, no es un aparte.** Último párrafo del archivo, entero entre rayas, idéntico en forma a un aparte fuera de micrófono. Es el cierre de boletín de Presidencia. Se quita antes de segmentar y solo si está al final.
+- **La autopresentación del periodista es su propia oración.** `Gracias, Presidenta. Dalila Escobar, de Proceso.` Un regex de `Nombre, de Medio` sin anclar a inicio y fin de oración encuentra seis periodistas en la conferencia del 2026-08-18, que tiene cuatro: se traga `...a Andrés Manuel López Beltrán, de encabezar una red de huachicol`, donde el `de` introduce un verbo y no un medio.
 - **`INTERVENCIÓN:` no es un hablante.** Verificado en `fixtures/2026-08-18.txt`: 5 ocurrencias, ninguna dentro de un bloque de video, contenido siempre `(Inaudible)` o un fragmento fuera de micrófono entre rayas (`—25—`). Es ruido de sala. Se marca `ruido: true` y **no interrumpe la propagación de identidad dentro del hilo**: si se trata como turno normal, parte hilos en dos en silencio, que es exactamente el error que no se detecta mirando el conteo de periodistas.
 
 ## Contratos de datos

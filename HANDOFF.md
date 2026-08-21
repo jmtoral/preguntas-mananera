@@ -8,12 +8,47 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Estado
 
-**Fase actual:** 1 (andamiaje) terminada. Fase 2 (parser contra una conferencia) no iniciada.
+**Fase actual:** 2 (parser contra una conferencia) terminada. Fase 3 (parser contra varios años) no iniciada.
 **Última actualización:** 2026-08-21.
 **Ambiente conda:** **`votaciones_corte`**, Python 3.11.14, en `C:\Users\User\anaconda3\envs\votaciones_corte`. Aprobado por el humano el 2026-08-21 para usarse directo, sin clonar.
-**Bloqueado esperando:** confirmación para arrancar la fase 2. Además, **no se ha hecho ningún commit**: el repo está inicializado y todo el andamiaje existe en el disco, pero sin historial. Falta el visto bueno del humano para commitear.
+**Bloqueado esperando:** confirmación para arrancar la fase 3.
 
 ## Hecho
+
+### Parser contra una conferencia (fase 2)
+
+`src/estenograficas/parser.py` y `tests/test_parser.py`, sin red. **43 pruebas en total, 43 pasan** (24 nuevas del parser).
+
+**La prueba de aceptación pasa:** los cuatro periodistas salen y son exactamente Nancy Rodríguez (Oro Sólido y de Empuje Migrante), Javier Tovar (Agencia France-Presse), Dalila Escobar (Proceso) y Hans Salazar (Noticiero en Redes). Cuatro hilos, ni uno más.
+
+**Lo que costó: un regex ingenuo de `Nombre, de Medio` encuentra SEIS periodistas en esta conferencia.** Los dos de más son `Andrés Manuel López Beltrán, de encabezar una red de huachicol` —donde el `de` introduce un verbo, no un medio— y `Estados Unidos, de Cambridge Analytica`. No se arreglaron con una lista negra. La diferencia real es estructural: **la autopresentación es su propia oración**, empieza tras punto y termina en punto. Anclando el regex a límites de oración, y solo en los primeros 300 caracteres, quedan cuatro. Ya está documentado como trampa en `CLAUDE.md`.
+
+**Trampa nueva encontrada: `—000—`.** Último párrafo del archivo, entero entre rayas, indistinguible en forma de un aparte fuera de micrófono. Es el cierre de boletín de Presidencia. Se colaba como aparte del último turno de la presidenta. Se quita antes de segmentar y solo si está al final. Documentada en `CLAUDE.md`.
+
+**Segmentación, verificada por fuera del parser.** Los números de la prueba no salen del parser: se contaron con un `awk` independiente sobre el texto crudo, excluyendo bloques de video y partiendo por las líneas de las cuatro autopresentaciones (368, 508, 676, 940). Cuadra exacto.
+
+| | turnos |
+|---|---|
+| exposición previa a la primera pregunta | 17 |
+| hilo 0, Nancy Rodríguez | 22 |
+| hilo 1, Javier Tovar | 12 |
+| hilo 2, Dalila Escobar | 62 |
+| hilo 3, Hans Salazar | 46 |
+| **total** | **159** |
+
+Preguntas no-ruido por hilo: 9, 6, 31 y 12.
+
+**Trampas verificadas contra el fixture:**
+
+- **Videos:** 3 bloques quitados, 0 aperturas sin cerrar, y **las 18 etiquetas contaminantes** (`VOZ MUJER`, `VOZ HOMBRE`, `DERECHOHABIENTE`, `MADRE DEL PACIENTE`) desaparecieron. Hay prueba aparte de que un video **sin cerrar** se reporta en vez de tragarse el resto del archivo.
+- **`INTERVENCIÓN:`** 5 ocurrencias, 4 dentro del hilo de Hans Salazar, **ninguna partió un hilo**. Van con `atribucion: "incierta"` y `quien: null`.
+- **Interjecciones del pleno:** una sola racha en toda la conferencia, de 3 turnos `PREGUNTA` consecutivos y cortos (31, 9 y 12 caracteres): "A lo mejor no la han informado" / "¿Quiénes?" / "¿De quiénes?". Los tres quedan inciertos y sin periodista. Hay prueba de que dos preguntas **largas** seguidas NO se marcan como interjección, que es el falso positivo que importa.
+- **Apartes:** 32 extraídos a su campo y sacados del texto. Un inciso dentro de una oración (`—si me dan la siguiente—`) **no** se toca: la diferencia es ocupar el párrafo entero, y hay prueba de las dos caras.
+- **Encabezado:** los 4 renglones de título y caption quedan aparte; el primer turno es la presidenta diciendo exactamente `Buenos días.`
+- **Saludos:** filtrados por patrón de cortesía completa, no por longitud. `¿No se le censura?` es igual de corto y no se filtra.
+
+**Atribución final de los 67 turnos de prensa en hilos:** 4 declarada, 56 propagada, 7 incierta. Ningún turno incierto trae periodista.
+
 
 ### Andamiaje (fase 1)
 
@@ -118,10 +153,7 @@ El humano dijo el 2026-08-21 que todavía no le queda claro en qué consiste su 
 
 ## Siguiente paso concreto
 
-Dos cosas, en este orden:
-
-1. **Commitear el andamiaje.** El repo no tiene ni un commit. `git add -A` mete 15 archivos y ya se verificó que ni `.env` ni `data/` entran.
-2. **Fase 2: parser contra una conferencia.** Escribir `src/estenograficas/parser.py` y `tests/test_parser.py` contra `fixtures/2026-08-18.txt`, sin red. Los criterios de aceptación endurecidos están en `PROMPT.md`, fase 2: no basta con encontrar a los cuatro periodistas —hay 65 turnos `PREGUNTA:` y solo 4 autopresentaciones—, hay que asertar también que los 3 bloques de video desaparecen con sus 18 etiquetas contaminantes, que las 5 `INTERVENCIÓN:` quedan `ruido: true` sin partir hilos, el número de hilos y turnos por hilo cuadrados a mano, y que ningún `PREGUNTA:` con `atribucion: "incierta"` tenga periodista asignado.
+**Fase 3: parser contra varios años.** Bajar a mano tres o cuatro conferencias sueltas —una de finales de 2024, una de 2025 y una de 2026 distinta a la que ya está—, guardarlas en `fixtures/` y correr el parser sobre ellas. El formato cambia con el tiempo y todo lo verificado hasta hoy vale para un solo archivo de 2026. Diagnóstico: qué etiquetas aparecen en unas y no en otras, y si las trampas de `CLAUDE.md` siguen siendo ciertas en 2024.
 
 ## Decisiones tomadas
 
@@ -145,17 +177,27 @@ Dos cosas, en este orden:
 | Un item rechazado cuenta como procesado y no se reintenta solo | Reintentar debe ser un acto deliberado —borrar el renglón—, no algo que pase por inercia en cada corrida | 1 |
 | Última línea truncada se tolera; una rota en medio es error | Al final es una escritura interrumpida y es esperable; en medio es corrupción y no se adivina qué decía | 1 |
 | Se le quitó `prefix:` a `environment.yml` | Filtraba la ruta absoluta de esta máquina y no aporta nada a la reproducción | 1 |
+| La autopresentación se ancla a límites de oración | Sin eso el regex encuentra 6 periodistas donde hay 4. No se usó lista negra: la diferencia es estructural, no de nombres | 2 |
+| Un hilo abre solo con autopresentación explícita | Lo demás sería inventar. Un periodista que nunca se presenta queda absorbido por el hilo anterior y se reporta como problema abierto, no se adivina | 2 |
+| `INTERVENCIÓN` va con rol `pregunta` y atribución `incierta` | Viene del pleno, no de los funcionarios; el contrato solo admite dos roles y `respuesta` sería mentira | 2 |
+| El aparte se define por párrafo entero entre rayas | Es lo que separa el habla fuera de micrófono del inciso hablado dentro de una oración | 2 |
+| El ruido se filtra por patrón de cortesía, no por longitud | `¿No se le censura?` tiene 18 caracteres y es una pregunta real | 2 |
+| Se marcan como ruido los agradecimientos, no solo los saludos | `CLAUDE.md` dice "saludos"; un "Muchas gracias, Presidenta" es la misma cortesía y tampoco es una pregunta. Extensión menor, anotada por si se quiere revertir | 2 |
+| Solo raya y semirraya delimitan apartes, no el guion ASCII | El guion se usa en rangos y compuestos y generaba falsos apartes | 2 |
 
 ## Problemas abiertos
 
-1. **El repo está inicializado pero sin ningún commit.** Todo el andamiaje vive solo en el disco. Un `rm -rf` accidental se lo lleva completo, incluidas las correcciones a `CLAUDE.md` y `PROMPT.md`. Pendiente el visto bueno para commitear.
-2. **No se verificó que el otro proyecto que usa `votaciones_corte` siga funcionando** después de la instalación. El dry-run no mostró downgrades, que es evidencia buena pero no es haberlo corrido. Si `votaciones_corte` empieza a fallar en su proyecto original, empezar por aquí.
-3. **`environment.yml` lista de más.** Como `votaciones_corte` es compartido, el export trae paquetes del otro proyecto. Reconstruirlo en otra máquina da un ambiente que funciona pero más gordo que el mínimo, y con torch CPU. Si algún día importa, se recorta a mano.
-4. **Sin estimación de costo para la fase 11.** ~10 mil preguntas × 3 corridas ≈ 30 mil llamadas. Se estima antes de la fase 9, no al llegar a la 11.
-5. **La compensación del instructivo de codificación no está resuelta.** Ejemplos trabajados por el agente hacen la tarea posible pero anclan al humano a la lectura del agente. La alternativa es que el humano codifique 10 en frío primero y de ahí salga el instructivo. Se decide al llegar a la fase 9.
-6. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un `DataFrame` de pandas 3.0.1 y pasó, pero no se ha corrido nada que combine pandas 3.0 con `sentence-transformers`. Si algo truena raro en las fases 8 o 12, sospechar de aquí.
-7. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`. Anotado ahora porque en la fase 12 se va a ver como un warning ignorable y no lo es.
-8. **La cobertura del fixture es de una sola conferencia y de 2026.** Todo lo verificado hasta ahora —incluida la trampa de los videos y `INTERVENCIÓN:`— vale para ese archivo. La fase 3 existe para ver qué se rompe en 2024 y 2025.
+1. **Hay una atribución que sabemos que está mal y no se parchó.** El turno `PREGUNTA: No lo interrumpas cuando…` quedó atribuido a Hans Salazar como `propagada`. Es alguien del salón regañando a otro, no Hans. La heurística de interjecciones no lo agarra porque es un solo turno con respuesta antes y después, no una racha. **No se metió un caso especial a propósito** (`CLAUDE.md`: no parchar para que un caso raro deje de fallar). Es la clase de error que la parada obligatoria de la fase 6 existe para encontrar, y es evidencia de que la propagación hacia adelante tiene un piso de error irreducible sin juicio humano.
+2. **El hilo de Dalila Escobar tiene 62 turnos y 31 preguntas, muy por encima de los otros tres.** Puede ser real —ella misma dice "el último, tercer tema"— o puede ser que otro periodista habló sin presentarse y quedó absorbido en su hilo. No se puede distinguir sin leer. Revisar en la fase 6.
+3. **Tres turnos `INTERVENCIÓN` quedan con `texto` vacío** porque todo su contenido era un aparte (`—25—`, `—36 [por ciento] del '24 al…—`). Es correcto según el contrato, pero un texto vacío es fácil de confundir con un error de parseo cuando se vean 460 conferencias.
+4. **El fixture empieza con `ersión estenográfica`**, sin la V inicial. Es un defecto del texto de origen, no del parser. Si aparece en más archivos, la extracción del título en la fase 6 tiene que tolerarlo.
+5. **No se verificó que el otro proyecto que usa `votaciones_corte` siga funcionando** después de la instalación. El dry-run no mostró downgrades, que es evidencia buena pero no es haberlo corrido. Si `votaciones_corte` empieza a fallar en su proyecto original, empezar por aquí.
+6. **`environment.yml` lista de más.** Como `votaciones_corte` es compartido, el export trae paquetes del otro proyecto. Reconstruirlo en otra máquina da un ambiente que funciona pero más gordo que el mínimo, y con torch CPU. Si algún día importa, se recorta a mano.
+7. **Sin estimación de costo para la fase 11.** ~10 mil preguntas × 3 corridas ≈ 30 mil llamadas. Se estima antes de la fase 9, no al llegar a la 11.
+8. **La compensación del instructivo de codificación no está resuelta.** Ejemplos trabajados por el agente hacen la tarea posible pero anclan al humano a la lectura del agente. La alternativa es que el humano codifique 10 en frío primero y de ahí salga el instructivo. Se decide al llegar a la fase 9.
+9. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un `DataFrame` de pandas 3.0.1 y pasó, pero no se ha corrido nada que combine pandas 3.0 con `sentence-transformers`. Si algo truena raro en las fases 8 o 12, sospechar de aquí.
+10. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`. Anotado ahora porque en la fase 12 se va a ver como un warning ignorable y no lo es.
+11. **La cobertura del fixture es de una sola conferencia y de 2026.** Todo lo verificado hasta ahora —incluida la trampa de los videos y `INTERVENCIÓN:`— vale para ese archivo. La fase 3 existe para ver qué se rompe en 2024 y 2025.
 
 ## Cómo retomar
 
