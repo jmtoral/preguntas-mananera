@@ -1,0 +1,30 @@
+# Secretos. Esta línea es la razón por la que .gitignore se escribió antes del primer commit.
+.env
+.env.*
+!.env.example
+
+# Datos. El corpus no vive en git: data/raw/ pesa cientos de MB y es inmutable,
+# se respalda aparte. Ver CLAUDE.md, sección Respaldo.
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Modelos y cachés de embeddings descargados
+.cache/
+*.safetensors
+
+# Entorno y editor
+.venv/
+venv/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

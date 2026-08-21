@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "estenograficas"
+version = "0.1.0"
+description = "Análisis de contenido de las versiones estenográficas de las conferencias de prensa de la Presidencia de México"
+requires-python = ">=3.11"
+
+# Las dependencias no se declaran aquí a propósito. El ambiente es conda
+# (`votaciones_corte`) y la fuente de verdad es environment.yml. Declararlas
+# en los dos lados garantiza que se desincronicen.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# -ra muestra la razón de todo lo que no pasó, incluidos skips. Un test
+# saltado en silencio es un test que no existe.
+addopts = "-ra"
+markers = [
+    "lento: pruebas que lanzan subprocesos o duermen; se corren igual, solo tardan",
+]
