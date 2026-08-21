@@ -11,9 +11,39 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 **Fase actual:** 3 (parser contra varios años) terminada. Fase 4 (descubrimiento de URLs) no iniciada.
 **Última actualización:** 2026-08-21.
 **Ambiente conda:** **`votaciones_corte`**, Python 3.11.14, en `C:\Users\User\anaconda3\envs\votaciones_corte`. Aprobado por el humano el 2026-08-21 para usarse directo, sin clonar.
-**Bloqueado esperando:** decisión sobre cómo bajar el corpus. **gob.mx bloquea a los clientes que no ejecutan JavaScript** y eso cambia el plan de las fases 4 y 5. Ver "Problemas abiertos", punto 1.
+**Bloqueado esperando:** aprobación para instalar **Playwright** (paquete más un Chromium de ~150 MB). La estrategia de descarga ya está decidida —mixta, Wayback más gob.mx con navegador— y la cobertura de Wayback ya está medida. Sin Playwright no se puede escribir la mitad de la fase 4 que toca gob.mx. **No se instaló nada.**
 
 ## Hecho
+
+### Medición de la cobertura de Wayback (previa a la fase 4)
+
+Pedida por el humano el 2026-08-21 para decidir cómo bajar el corpus. Decisión ya tomada: **estrategia mixta**, Wayback de base y gob.mx con navegador para los huecos.
+
+**1,221 capturas** de la API CDX bajo el prefijo `version-estenografica-conferencia-de-prensa-de-la-presidenta-claudia-sheinbaum-pardo-del-`, entre octubre de 2024 y agosto de 2026. De ahí: 352 fechas con alguna captura, **50 fechas donde Wayback SOLO tiene capturas 4xx/5xx**, y **302 fechas utilizables**.
+
+**Cobertura global: 61.1%** (302 de 494 días hábiles). Pero el promedio esconde lo único que importa, que es *cuándo* falta:
+
+| tramo | días hábiles | en Wayback | falta | cobertura |
+|---|---|---|---|---|
+| 2024-10 a 2026-01 | 336 | 267 | 69 | **~80%** |
+| 2026-02 a 2026-08 | 158 | 35 | 123 | **~22%** |
+
+Mes a mes, de octubre de 2024 a enero de 2026 la cobertura va entre 65% y 95%. **A partir de febrero de 2026 se desploma:** 35%, 14%, 9%, 19%, 14%, 4%, 13%. Es el rezago normal de rastreo del archivo: lo reciente todavía no está archivado.
+
+Consecuencia para el plan: **de gob.mx hay que bajar como máximo 192 conferencias**, de las cuales 123 son de los últimos siete meses. No 460. Wayback carga con el 61% y con casi todo lo viejo.
+
+**Dos errores míos de medición, corregidos, porque el número cambió con cada uno:**
+
+1. Filtrar `statuscode:200` en la consulta CDX tira las capturas *revisit* (`-`), que sí tienen contenido.
+2. `collapse=urlkey` devuelve **una** captura por URL, y a veces devuelve un 404 aunque exista un 200 de la misma página.
+
+Los dos subestimaban, de formas distintas. La medición buena no colapsa: trae todas las capturas y cuenta una fecha como cubierta si tiene al menos una captura que no sea 4xx ni 5xx.
+
+**Advertencias sobre este número:**
+
+- **192 es cota superior de lo que falta.** Parte de esos días hábiles simplemente no tuvieron conferencia: días festivos, giras, Semana Santa. Cuántos exactamente no se sabe hasta poder listar el propio archivo de gob.mx.
+- Las fechas salen del **slug**, y `CLAUDE.md` advierte que traen erratas. Se confirmó: hay slugs con año truncado (`-de-202`), con backslash pegado (`%5C`) y con sufijo numérico (`-421610`). Uno de ~500 quedó ilegible. La fecha canónica tiene que salir del contenido, no del slug.
+- Se buscó bajo un solo patrón de slug. Existen otros (`conferencia-de-prensa-matutina`, `del-presidente-andres-manuel-lopez-obrador`), pero corresponden a otras cosas o al sexenio anterior.
 
 ### Parser contra varios años (fase 3)
 
@@ -187,13 +217,14 @@ El humano dijo el 2026-08-21 que todavía no le queda claro en qué consiste su 
 
 ## Siguiente paso concreto
 
-**Decidir cómo se baja el corpus, antes de tocar la fase 4.** gob.mx bloquea a curl y a cualquier cliente sin JavaScript. Tres caminos, y la decisión es del humano porque tienen costos distintos:
+**Estrategia decidida por el humano el 2026-08-21: mixta.** Wayback de base, gob.mx con navegador para los huecos. La medición ya está hecha (ver arriba) y dice que de gob.mx hay que bajar a lo más 192 conferencias, 123 de ellas de febrero de 2026 en adelante.
 
-1. **Wayback Machine para todo.** Ya está probado y funciona; la API CDX permite listar todas las capturas de `version-estenografica-conferencia-de-prensa-*` por año, lo que además **resuelve la fase 4 sin recorrer el archivo paginado de gob.mx**. Riesgo: la cobertura no es completa y hay que medir cuánto falta antes de comprometerse. `CLAUDE.md` ya advertía de no asumir cobertura total.
-2. **Navegador automatizado** (Playwright) contra gob.mx. Ejecuta el JavaScript y pasa el reto. Costo: dependencia pesada nueva, mucho más lento que un request, y hay que discutir si es apropiado dar la vuelta a un control anti-bot de un sitio de gobierno.
-3. **Mixto:** Wayback como fuente principal, gob.mx con navegador solo para los huecos que Wayback no cubra.
+**Pendiente antes de escribir código de la fase 4: aprobar Playwright.** Es una dependencia nueva y pesada —además del paquete, descarga un navegador Chromium completo, del orden de 150 MB— y `CLAUDE.md` prohíbe agregar dependencias pesadas sin justificarlas. La justificación es que sin ejecutar JavaScript no hay forma de leer gob.mx, y sin gob.mx falta el 39% del corpus y casi todo 2026. **No se instaló nada.**
 
-Recomendación: empezar por **medir la cobertura de Wayback** —un conteo por mes desde octubre de 2024— y decidir con ese número a la vista. Eso es barato y es lo que la fase 4 pedía como diagnóstico de todos modos.
+Después, la fase 4 en dos mitades:
+
+1. **Wayback:** ya está resuelta, la lista sale de la API CDX. Escribir `src/estenograficas/descubrimiento.py` que la consulte y escriba `data/interim/urls.jsonl` con `fuente: "wayback"`.
+2. **gob.mx:** recorrer el archivo paginado con navegador para las fechas que Wayback no cubre, y así también saber cuáles de esos 192 días de verdad no tuvieron conferencia.
 
 
 ## Decisiones tomadas
@@ -230,10 +261,13 @@ Recomendación: empezar por **medir la cobertura de Wayback** —un conteo por m
 | Los espacios Unicode se normalizan antes de segmentar | Un espacio duro tras la etiqueta funde el turno con el anterior en silencio | 3 |
 | Se contemplan muletillas de presentación (Soy, Su servidor, Mi nombre es) | Sin ellas se pierde el hilo completo de quien se presenta así, y el nombre sale con el verbo pegado | 3 |
 | Las pruebas multianio afirman invariantes, no conteos | Los conteos de esas cuatro no se cuadraron a mano; una prueba que afirme un número salido del propio parser no prueba nada | 3 |
+| Estrategia de descarga mixta: Wayback + gob.mx con navegador | Decisión del humano. Wayback cubre 80% hasta enero de 2026 pero solo 22% de febrero en adelante; ninguna fuente sola alcanza | previa a 4 |
+| La cobertura se mide sin `collapse` y sin filtro de statuscode | Las dos opciones subestiman: `statuscode:200` tira las capturas revisit, y `collapse=urlkey` puede devolver un 404 existiendo un 200 | previa a 4 |
+| La fecha canónica saldrá del contenido, no del slug | Confirmado que los slugs traen año truncado, backslash pegado y sufijos numéricos | previa a 4 |
 
 ## Problemas abiertos
 
-1. **gob.mx bloquea la descarga automatizada.** Responde 200 con una página de reto anti-bot en vez del contenido, aun con cabeceras de navegador completas. Las fases 4 y 5 estaban escritas suponiendo que se podía recorrer el sitio con requests; ese supuesto es falso. Ver "Siguiente paso concreto" para las tres opciones. **Este es el bloqueador real del proyecto ahora mismo.**
+1. **gob.mx bloquea la descarga automatizada.** Responde 200 con una página de reto anti-bot en vez del contenido, aun con cabeceras de navegador completas. Estrategia decidida: mixta. Bloqueador vigente: falta aprobar Playwright (descarga un Chromium de ~150 MB) antes de poder escribir la fase 4 completa.
 2. **Hay una atribución que sabemos que está mal y no se parchó.** El turno `PREGUNTA: No lo interrumpas cuando…` quedó atribuido a Hans Salazar como `propagada`. Es alguien del salón regañando a otro, no Hans. La heurística de interjecciones no lo agarra porque es un solo turno con respuesta antes y después, no una racha. **No se metió un caso especial a propósito** (`CLAUDE.md`: no parchar para que un caso raro deje de fallar). Es la clase de error que la parada obligatoria de la fase 6 existe para encontrar, y es evidencia de que la propagación hacia adelante tiene un piso de error irreducible sin juicio humano.
 3. **El hilo de Dalila Escobar tiene 62 turnos y 31 preguntas, muy por encima de los otros tres.** Puede ser real —ella misma dice "el último, tercer tema"— o puede ser que otro periodista habló sin presentarse y quedó absorbido en su hilo. No se puede distinguir sin leer. Revisar en la fase 6.
 4. **Tres turnos `INTERVENCIÓN` quedan con `texto` vacío** porque todo su contenido era un aparte (`—25—`, `—36 [por ciento] del '24 al…—`). Es correcto según el contrato, pero un texto vacío es fácil de confundir con un error de parseo cuando se vean 460 conferencias.
