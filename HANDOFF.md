@@ -8,13 +8,57 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Estado
 
-**Fase actual:** 4 (descubrimiento de URLs) terminada. Fase 5 (descarga) no iniciada.
+**Fase actual:** 5 (descarga) terminada. **Sigue la fase 6, que es PARADA OBLIGATORIA**: el humano tiene que revisar el conjunto de etiquetas antes de que el parseo masivo se dé por bueno.
 **Última actualización:** 2026-08-21, cerrando la sesión.
 **Ambiente conda:** **`votaciones_corte`**, Python 3.11.14, en `C:\Users\User\anaconda3\envs\votaciones_corte`. Aprobado por el humano el 2026-08-21 para usarse directo, sin clonar.
-**Bloqueado esperando:** nada. Se puede continuar directo.
+**Bloqueado esperando:** que el humano **respalde `data/raw/` fuera del repo**. Son 460 conferencias, 75 MB, y no están en git. `CLAUDE.md` exige el respaldo antes de que empiece cualquier etapa que las consuma, y la fase 6 las consume.
 
 
 ## Hecho
+
+### Descarga del corpus (fase 5) — TERMINADA
+
+**460 conferencias en `data/raw/`, 75 MB, del 2024-10-03 al 2026-08-20. Tasa de éxito 99.6%** (460 de 462 procesadas). Las **460 salieron de gob.mx**; Wayback no tuvo que entrar como respaldo ni una vez.
+
+**Los 2 "rechazos" no son fallos.** Los dos dicen `ya existe X.html; el crudo no se sobreescribe`, o sea que la regla de inmutabilidad hizo su trabajo:
+
+- El slug con el año truncado (`-del-30-de-marzo-de-202`) resultó ser un duplicado de `2026-03-30`, que ya se había bajado por su URL buena.
+- **La conferencia de Culiacán resultó ser la misma del 2025-07-11**, publicada bajo dos URLs. Corrijo lo que dije antes: no era una conferencia distinta que faltara, era una entrada duplicada. Se descubrió justo porque la fecha se saca del contenido.
+
+**Sacar la fecha del contenido en vez del slug recuperó dos conferencias.** Dos slugs mienten sobre su propia fecha, y el contenido dice `2024-10-28` y `2026-03-18`. **Las dos estaban en la lista de días sin conferencia de la fase 4**, o sea que se habrían dado por perdidas. Es exactamente lo que `CLAUDE.md` advertía al prohibir construir slugs por fecha.
+
+**Cobertura final: 93.7%** de los días hábiles entre el 2024-10-03 y el 2026-08-20 (460 de 491). Los 31 restantes son los festivos ya identificados en la fase 4.
+
+**Verificación de punta a punta.** El parser corre contra las 460 sin una sola excepción:
+
+| | |
+|---|---|
+| turnos totales | 64,975 |
+| turnos de prensa | **27,280** |
+| hilos | 2,140 |
+| promedio por conferencia | 141 turnos, 59 de prensa, 4.7 hilos |
+
+**Ese 27,280 corrige una estimación del plan.** `CLAUDE.md` dice "del orden de 10 mil turnos de pregunta"; son casi el triple. Buena parte serán ruido y repreguntas cortas, pero **la estimación de costo de la fase 11 hay que rehacerla sobre este número**, no sobre 10 mil.
+
+**7 conferencias quedan sin ningún hilo** y hay que mirarlas en la fase 6: `2024-12-18`, `2025-04-02`, `2025-04-07`, `2025-05-21`, `2025-10-03`, `2026-05-20`, `2026-05-29`. Ninguna truena; simplemente ningún periodista se autopresentó de forma reconocible. La más chica del corpus es `2026-05-29` con 92 KB.
+
+**El checkpoint pasó su prueba en producción.** A mitad de la descarga maté el proceso a propósito (por una falsa alarma de encoding). Al relanzarlo retomó sin rehacer nada y sin una sola línea truncada. Eso ya no es un test, es el caso real.
+
+### Dos cambios de formato de 2024, encontrados al mirar lo descargado
+
+No son de la descarga sino del parser, y son los más caros hallados hasta ahora. Salieron de correr el parser contra las primeras 90 conferencias bajadas, no de leer código.
+
+**1. `INTERLOCUTOR` e `INTERLOCUTORA` son etiquetas de PRENSA.** Es la forma que se usó antes de estandarizar `PREGUNTA`: **421 turnos en 18 conferencias, todas entre el 3 y el 29 de octubre de 2024**. El parser las tomaba como funcionario, es decir que **convertía preguntas de periodistas en declaraciones de gobierno**. Es el peor error posible en un proyecto que mide qué pregunta la prensa, y no habría dado ningún síntoma: el pipeline corría, los archivos salían bien formados, y octubre de 2024 simplemente parecía un mes en que la prensa casi no preguntaba.
+
+Efecto de la corrección: 2024-10-03 pasa de 11 a **33** turnos de prensa; 2024-10-08 de 16 a **52**.
+
+**2. El orden de la etiqueta se invierte según el año.** En 2026 es `CARGO, NOMBRE`; en octubre de 2024 es `NOMBRE, CARGO` (`CITLALLI HERNÁNDEZ MORA, SECRETARIA DE LAS MUJERES`). Sobre las primeras 90 conferencias: **116 al derecho contra 60 al revés**, más 31 ambiguas. Un `rsplit(",", 1)` a ciegas intercambia cargo y nombre en un tercio de los funcionarios. Ahora se orienta por **cuál de los dos lados nombra un cargo**, no por la posición; ante la duda se respeta el orden dominante.
+
+También: `ASISTENTES` pasa a ruido de sala, es el pleno coreando.
+
+**Falsa alarma que conviene dejar registrada.** Creí ver mojibake en los archivos descargados y detuve la descarga a medias para investigarlo. No lo hay: los acentos vienen como entidades HTML (`&Oacute;`), BeautifulSoup los resuelve bien, y lo que se veía mal era la consola de Windows al imprimir. Los 464 archivos están en UTF-8 limpio. El susto sirvió para una cosa: **el checkpoint sobrevivió a que matara el proceso a mitad de la descarga**, que es exactamente la prueba que la fase 1 montó y esta vez pasó en producción, no en un test.
+
+**Pendiente relacionado, para la fase 6:** hay tres formas distintas de la etiqueta de la presidenta —`PRESIDENTA CLAUDIA SHEINBAUM PARDO` (742 turnos), `PRESIDENTA DE MÉXICO, CLAUDIA SHEINBAUM PARDO` y `PRESIDENTA DE MÉXICO CLAUDIA SHEINBAUM PARDO` sin coma—. Son la misma persona y hay que unificarlas.
 
 ### Descubrimiento de URLs (fase 4) — TERMINADA
 
@@ -279,29 +323,22 @@ El humano dijo el 2026-08-21 que todavía no le queda claro en qué consiste su 
 
 ## Siguiente paso concreto
 
-**Fase 5: descarga.** Escribir `src/estenograficas/descarga.py` que consuma `data/interim/urls.jsonl` y baje el HTML crudo a `data/raw/{conferencia_id}.html`.
+**Primero, antes de cualquier código: respaldar `data/raw/` fuera del repo.** 460 archivos, 75 MB, no están en git, y volver a bajarlos cuesta 15 minutos de navegador y depende de que gob.mx siga sirviendo. `CLAUDE.md` lo exige antes de que empiece cualquier etapa que los consuma.
 
-Requisitos que ya están decididos y no hay que volver a discutir:
+**Después, fase 6: parseo masivo. ES PARADA OBLIGATORIA.**
 
-- **Playwright headful** para gob.mx, ventana fuera de pantalla, reutilizando **un solo contexto** para todas las descargas: ya se probaron cinco seguidas a un request por segundo sin que el reto reapareciera. Abrir un navegador por página sería absurdo.
-- **Un request por segundo**, reintentos con backoff, **checkpoint conforme avanza** con el módulo `checkpoint`.
-- **El HTML crudo es inmutable**: si `data/raw/{id}.html` ya existe, no se vuelve a bajar ni se sobreescribe.
-- **Manejar gzip.** Ya mordió una vez en la fase 3: una captura vino comprimida y se guardó binario.
-- **Wayback como respaldo** para las URLs de gob.mx que fallen, no como fuente por defecto.
-- Las 4 URLs sin `conferencia_id` necesitan que la fecha salga del **contenido**, no del slug. La de Culiacán es una conferencia real.
-- Al terminar, **recordarle al humano respaldar `data/raw/` fuera del repo** antes de que nada lo consuma.
-- Diagnóstico que pide la fase: tasa de éxito y lista de fallos.
+1. Escribir la etapa que corre el parser sobre las 460 y escribe `data/interim/turnos.jsonl`, `data/interim/hilos.jsonl` y `data/interim/conferencias.jsonl` con el `tema_dia`, todo con checkpoint y con archivo de rechazos.
+2. **Producir el diagnóstico obligatorio:** el conjunto completo de etiquetas de hablante únicas ordenadas por frecuencia, más 10 turnos al azar con su etiqueta y sus primeros 200 caracteres, más la distribución de temas del día.
+3. **Detenerse y esperar al humano.** No seguir a la fase 7 sin su visto bueno. Una etiqueta que aparece tres veces en 460 conferencias casi siempre es un error de parseo, y ya se comprobó en esta sesión que ese tipo de error no da síntomas: `INTERLOCUTOR` costó 421 turnos de prensa mal clasificados sin que nada fallara.
 
-Fragmento de Playwright que ya funciona, para no volver a descubrirlo:
+Lo que ya se sabe que hay que revisar en esa parada, todo detectado en esta sesión:
 
-```python
-nav = p.chromium.launch(
-    headless=False,                       # headless NO pasa el reto
-    args=["--window-position=-2400,-2400", "--window-size=1280,900"],
-)
-ctx = nav.new_context(locale="es-MX", user_agent=UA,
-                      viewport={"width": 1280, "height": 900})
-```
+- Las **7 conferencias sin ningún hilo**: `2024-12-18`, `2025-04-02`, `2025-04-07`, `2025-05-21`, `2025-10-03`, `2026-05-20`, `2026-05-29`.
+- Las **tres variantes de la etiqueta de la presidenta**, que hay que unificar.
+- Las etiquetas de **cargo sin coma** (`GOBERNADORA INTERINA DE SINALOA YERALDINE BONILLA VALVERDE`), que `rsplit` no separa.
+- Si `INTERVENCIÓN` de verdad no existe en 2024 o fue azar de la muestra.
+- La **docena de días hábiles sin conferencia** que no son festivos obvios.
+- **Rehacer la estimación de costo de la fase 11 sobre 27,280 turnos de prensa**, no sobre los 10 mil que supone `CLAUDE.md`.
 
 
 ## Decisiones tomadas
@@ -345,6 +382,10 @@ ctx = nav.new_context(locale="es-MX", user_agent=UA,
 | gob.mx pasa a ser la fuente principal y Wayback el respaldo | El archivo entero son 108 páginas, ~2 minutos. La estrategia mixta se decidió creyendo que era caro; no lo es. Da además la URL canónica | 4 |
 | Las estenográficas que no son conferencia matutina se listan aparte | Regla dura 3: nada se descarta en silencio. Son 497 y quedaron en otras_estenograficas.txt por si alguna resulta relevante | 4 |
 | El recorrido del archivo lleva checkpoint por página | Son 110 páginas con navegador; si se corta a la mitad no tiene sentido volver a empezar | 4 |
+| Se pasa el reto una vez y luego se usa `context.request` | Comparte la cookie del navegador pero devuelve el cuerpo crudo; `page.content()` daría el DOM serializado por Chromium, no los bytes del servidor | 5 |
+| La fecha del contenido manda sobre la del slug | Recuperó dos conferencias que estaban listadas bajo una fecha equivocada y que se habrían dado por perdidas | 5 |
+| `INTERLOCUTOR` e `INTERLOCUTORA` son prensa | 421 turnos en octubre de 2024. Contarlos como funcionarios convierte preguntas de periodistas en declaraciones de gobierno | 5 |
+| La etiqueta se orienta por dónde está el cargo, no por la posición | El orden se invierte según el año: 116 `CARGO, NOMBRE` contra 60 `NOMBRE, CARGO` en las primeras 90 conferencias | 5 |
 
 ## Problemas abiertos
 
@@ -359,6 +400,10 @@ ctx = nav.new_context(locale="es-MX", user_agent=UA,
 9. **La compensación del instructivo de codificación no está resuelta.** Ejemplos trabajados por el agente hacen la tarea posible pero anclan al humano a la lectura del agente. La alternativa es que el humano codifique 10 en frío primero y de ahí salga el instructivo. Se decide al llegar a la fase 9.
 10. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un `DataFrame` de pandas 3.0.1 y pasó, pero no se ha corrido nada que combine pandas 3.0 con `sentence-transformers`. Si algo truena raro en las fases 8 o 12, sospechar de aquí.
 11. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`. Anotado ahora porque en la fase 12 se va a ver como un warning ignorable y no lo es.
+15. **`data/raw/` no está respaldado.** 460 archivos, 75 MB, fuera de git. Es el activo caro y bloquea la fase 6.
+16. **Siete conferencias sin ningún hilo:** `2024-12-18`, `2025-04-02`, `2025-04-07`, `2025-05-21`, `2025-10-03`, `2026-05-20`, `2026-05-29`. No truenan; nadie se autopresenta de forma reconocible. Revisar en la fase 6.
+17. **Tres variantes de la etiqueta de la presidenta** conviven en el corpus y hay que unificarlas.
+18. **El corpus tiene 27,280 turnos de prensa, no ~10 mil.** `CLAUDE.md` supone el orden de 10 mil; la estimación de costo de la fase 11 hay que rehacerla.
 12. **La cobertura sigue siendo de cinco conferencias.** Una de 2024, una de 2025 y tres de 2026. Suficiente para haber encontrado cuatro defectos reales, insuficiente para afirmar que el parser aguanta 460. La parada obligatoria de la fase 6 sigue siendo el filtro de verdad.
 13. **Una docena de días hábiles sin conferencia que no son festivos obvios:** 2024-10-28, 2024-11-18, 2024-11-19, 2024-12-12, 2025-06-16, 2025-06-17, 2025-09-01, 2025-11-10, 2025-12-05, 2025-12-12 y 2026-04-17. Pueden ser giras o pueden existir bajo otro slug. Revisar en la fase 6.
 14. **La conferencia de Culiacán no tiene fecha en el slug.** `...-en-culiacan-sinaloa`. Es real y está en `urls.jsonl` con `conferencia_id: null`. La fase 5 tiene que sacarle la fecha del contenido, y de paso confirmar si hay más conferencias fuera de Palacio Nacional con este patrón.
