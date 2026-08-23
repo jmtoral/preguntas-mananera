@@ -16,6 +16,46 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Hecho
 
+### Material de terceros en `assets/`
+
+El humano compartió el 2026-08-23 un archivo externo, `assets/Ranking_medios_mananeras_ene-jun_2026.xlsx`, con la instrucción de que **nunca se publique ni se comparta**. No se identifica aquí a su autoría, a propósito: nombrarla en un archivo versionado sería exactamente la fuga que se está evitando.
+
+**Estaba dentro del repo y NO estaba en `.gitignore`.** Nunca llegó a commitearse —se verificó con `git log --all -- assets/`—, pero estaba a un `git add -A` de distancia, y esta sesión corrió `git add -A` muchas veces. **Ya se ignoró el directorio `assets/` completo**, que también contiene `Línea de tiempo sucesos.xlsx`. Verificado con `git check-ignore`.
+
+Regla permanente, escrita también en `README.md`: se lee localmente para contrastar, no entra a ningún commit ni a ningún archivo derivado que se publique.
+
+### Contraste con un conteo manual externo
+
+Su archivo está bien documentado: fuente, unidad de conteo, unificaciones de marca aplicadas, y qué medios decidió **no** unificar. Cubre enero–junio de 2026, canonicalizado a mano, agrupando por reportero.
+
+| | ella | nosotros |
+|---|---|---|
+| intervenciones (ene–jun 2026) | **752** | **521** |
+| medios | 188 (canonicalizados) | 192 cadenas crudas |
+| periodistas | — | 164 |
+
+**Nos faltan 231 intervenciones, el 31%.** Ese hueco es el mejor dato que hay del proyecto ahora mismo, porque es una **medición externa de nuestra cobertura de identificación**: nuestro regex solo levanta al periodista que se autopresenta de forma reconocible, y ella los identificó a mano. Es exactamente lo que la fase 7 tiene que cerrar con el modelo sobre los turnos que el regex no resuelve.
+
+Ojo al interpretar el 31%: **no se puede atribuir todo a falta de recall todavía.** Su unidad es "una intervención por fecha y turno de pregunta de cada medio" y la nuestra es el hilo; si dos periodistas del mismo medio hablan el mismo día, puede que cuenten distinto. Descomponer ese hueco —cuánto es recall y cuánto es definición de unidad— es tarea de la fase 7.
+
+En el top la forma coincide razonablemente: Heraldo Media Group y Noticiero en Redes empatados arriba, luego Contralínea y Revista Fortuna. Revista Fortuna cuadra exacto (20 y 20). Las diferencias grandes (`Diario Basta`, `Grupo Imagen (Excélsior)`) son en parte de mi agrupación burda, no necesariamente datos faltantes.
+
+**Cómo se usa, decidido:** como **validación posterior**, nunca como insumo. Si construimos nuestra canonicalización copiando la suya, coincidir deja de ser evidencia de nada. Es la misma lógica que la codificación a ciegas y que los embeddings locales de la fase 12.
+
+### Codificación a ciegas: redacción aprobada e implementada
+
+El humano aprobó el 2026-08-23 la **opción 1**: tachar la autopresentación dentro del texto de la pregunta y dejar `[identificación removida]`, en vez de excluir del muestreo las preguntas que abren hilo.
+
+Implementado en `parser.redactar_identificacion()`, con 4 pruebas, incluida una que barre todas las preguntas `declarada` de la conferencia de muestra y verifica que ni el nombre ni el medio queden a la vista. Reemplaza solo la oración de presentación, no el turno, así que la pregunta se conserva y no se pierde la categoría de preguntas de apertura.
+
+Alcance del problema: **2,149 preguntas, el 10% del total**, dicen el medio dentro de su propio texto.
+
+**Falta:** la hoja real de la fase 9 todavía no existe. Hay una de ejemplo, con seis preguntas reales, en `data/gold/EJEMPLO_hoja_de_codificacion.xlsx`, con las cuatro columnas del libro de códigos como menú desplegable. **Esas seis preguntas quedan excluidas de la muestra de oro** porque el humano ya las vio; sus ids están en el commit correspondiente.
+
+### Hallazgo 8 de la parada de la fase 6
+
+**269 turnos traen una etiqueta sin separar dentro del texto.** La causa: `SECRETARIO DE SALUD, DAVID KERSHENOBICH (enlace videollamada):` — el paréntesis va en minúsculas y `_ETIQUETA` exige mayúsculas, así que no casa y el turno se funde con el anterior. Mismo error silencioso que `INTERLOCUTOR`. Pendiente de arreglar junto con el resto de la parada.
+
 ### Parseo masivo (fase 6) — CORRIDO. **ESPERANDO REVISIÓN DEL HUMANO.**
 
 `src/estenograficas/parseo.py`. Se corre con `python -m estenograficas.parseo`. **460 conferencias parseadas, 0 rechazadas.**
@@ -447,6 +487,9 @@ Cuando dé el visto bueno, el orden es:
 | Los cierres de video aceptan FINALIZA, FINALIZAN, CONCLUYE, TERMINA y AUDIO | 475 cierres contra 431 aperturas canónicas; faltaban formas | 6 |
 | La fase 6 reescribe los tres JSONL en cada corrida | Parsear las 460 toma un minuto; agregar dejaría renglones de una versión vieja del parser mezclados con los nuevos | 6 |
 | El tema del día va nulo cuando no se anuncia | 51% de las conferencias no anuncian tema. Nulo antes que inventado | 6 |
+| `assets/` completo va a `.gitignore` | Material de terceros compartido en confianza; estaba a un `git add -A` de entrar al historial | 6 |
+| La autopresentación se tacha del texto, no se excluye la pregunta | Decisión del humano. Conserva la categoría de preguntas de apertura, que es el 10% y no es como el resto | 9 |
+| El conteo externo se usa como validación posterior, no como insumo | Si la canonicalización se construye copiando la suya, coincidir deja de ser evidencia. Misma lógica que la codificación a ciegas | 7 |
 
 ## Problemas abiertos
 
@@ -467,6 +510,9 @@ Cuando dé el visto bueno, el orden es:
 19. **`PREGUNTA (VIDEOLLAMADA)` se cuenta como funcionario:** 36 turnos de prensa mal clasificados. Pendiente de que el humano apruebe tratar cualquier etiqueta que empiece con `PREGUNTA` como prensa.
 20. **269 turnos de contaminación de video sobreviven** en 62 conferencias. Caen como `anonimo`, así que no ensucian el conteo de prensa, pero están en el flujo. Pendiente decidir si se filtran por etiqueta.
 21. **El `tema_dia` solo cubre el 49% y su calidad es despareja.** Sirve para agrupar a grandes rasgos, no para cruzarlo en el análisis final tal como está.
+22. **269 turnos con una etiqueta sin separar dentro del texto**, por paréntesis en minúsculas como `(enlace videollamada):`. Hallazgo 8 de la parada de la fase 6.
+23. **Nos faltan 231 intervenciones (31%) contra el conteo manual externo** en enero-junio de 2026. Parte es recall de identificación, parte puede ser diferencia en la unidad de conteo. Descomponerlo es tarea de la fase 7.
+24. **La hoja real de codificación no existe todavía**, solo el ejemplo. Sale en la fase 9.
 18. **El corpus tiene 27,280 turnos de prensa, no ~10 mil.** `CLAUDE.md` supone el orden de 10 mil; la estimación de costo de la fase 11 hay que rehacerla.
 12. **La cobertura sigue siendo de cinco conferencias.** Una de 2024, una de 2025 y tres de 2026. Suficiente para haber encontrado cuatro defectos reales, insuficiente para afirmar que el parser aguanta 460. La parada obligatoria de la fase 6 sigue siendo el filtro de verdad.
 13. **Una docena de días hábiles sin conferencia que no son festivos obvios:** 2024-10-28, 2024-11-18, 2024-11-19, 2024-12-12, 2025-06-16, 2025-06-17, 2025-09-01, 2025-11-10, 2025-12-05, 2025-12-12 y 2026-04-17. Pueden ser giras o pueden existir bajo otro slug. Revisar en la fase 6.

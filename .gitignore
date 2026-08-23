@@ -28,3 +28,8 @@ venv/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Material de terceros compartido en confianza. NUNCA se publica ni se comparte.
+# Se lee localmente para contrastar resultados; no entra al repo ni a ningún
+# archivo derivado que salga de esta máquina. Ver HANDOFF.md.
+assets/

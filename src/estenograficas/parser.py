@@ -358,6 +358,29 @@ VENTANA_IDENTIDAD = 300
 """Solo se miran los primeros 300 caracteres: regla dura 4 de CLAUDE.md."""
 
 
+MARCA_REDACTADA = "[identificación removida]"
+
+
+def redactar_identificacion(texto: str) -> tuple[str, bool]:
+    """Quita la autopresentación del periodista del texto de la pregunta.
+
+    El 10% de las preguntas —las 2,149 que abren hilo— dicen el medio dentro de
+    su propio texto: `"Buenos días. Carlos Navarro, de Heraldo Media Group.
+    Presidenta, ¿qué tiene de distinto…"`. Guardar el medio en una columna
+    aparte no sirve de nada si sigue estando en el texto que el humano lee: la
+    codificación dejaría de ser a ciegas y el análisis "descubriría" lo que se
+    metió por esa ventana.
+
+    Se reemplaza solo la oración de la presentación, no el turno completo, para
+    conservar la pregunta y no perder la categoría de preguntas de apertura.
+    Devuelve `(texto, se_redactó)`.
+    """
+    m = _IDENTIDAD.search(texto[:VENTANA_IDENTIDAD])
+    if not m:
+        return texto, False
+    return texto[: m.start()] + MARCA_REDACTADA + texto[m.end() :], True
+
+
 def identidad_declarada(texto: str) -> tuple[str, str] | None:
     """Extrae (nombre, medio) de la autopresentación, o None.
 

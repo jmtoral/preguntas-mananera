@@ -303,3 +303,63 @@ def test_los_hilos_cumplen_el_contrato(conf) -> None:
             assert t["rol"] in ("pregunta", "respuesta")
             assert t["atribucion"] in ("declarada", "propagada", "incierta")
             assert isinstance(t["ruido"], bool)
+
+
+# ===========================================================================
+# Redacción para la codificación a ciegas (fase 9)
+# ===========================================================================
+
+
+def test_la_autopresentacion_se_borra_del_texto() -> None:
+    """Sin esto la codificación deja de ser a ciegas.
+
+    El 10% de las preguntas dicen el medio dentro de su propio texto, así que
+    guardarlo en una columna aparte no protege nada.
+    """
+    from estenograficas.parser import MARCA_REDACTADA, redactar_identificacion
+
+    original = (
+        "Buenos días a todas y a todos. Carlos Navarro, de Heraldo Media Group. "
+        "Presidenta, ¿qué tiene de distinto este programa?"
+    )
+    salida, redactado = redactar_identificacion(original)
+    assert redactado
+    assert "Carlos Navarro" not in salida
+    assert "Heraldo Media Group" not in salida
+    assert MARCA_REDACTADA in salida
+    # y la pregunta sigue completa
+    assert "¿qué tiene de distinto este programa?" in salida
+    assert salida.startswith("Buenos días a todas y a todos.")
+
+
+def test_una_pregunta_sin_presentacion_no_se_toca() -> None:
+    from estenograficas.parser import redactar_identificacion
+
+    original = "¿Y un censo interno no ha hecho para conocer cuántas personas?"
+    salida, redactado = redactar_identificacion(original)
+    assert not redactado
+    assert salida == original
+
+
+def test_no_borra_un_nombre_del_que_solo_se_habla() -> None:
+    """Mismo ancla de oración que en la detección: si no es presentación, se queda."""
+    from estenograficas.parser import redactar_identificacion
+
+    original = "Se acusa a Andrés Manuel López Beltrán, de encabezar una red de huachicol."
+    salida, redactado = redactar_identificacion(original)
+    assert not redactado
+    assert salida == original
+
+
+def test_toda_pregunta_con_atribucion_declarada_queda_limpia(conf) -> None:
+    """Barrido sobre la conferencia de muestra: ninguna deja el medio a la vista."""
+    from estenograficas.parser import redactar_identificacion
+
+    medios = {h.medio for h in conf.hilos}
+    for h in conf.hilos:
+        for t in h.turnos:
+            if t.rol == "pregunta" and t.atribucion == "declarada":
+                limpio, _ = redactar_identificacion(t.texto)
+                for medio in medios:
+                    assert medio not in limpio, f"{medio} sigue visible"
+                assert h.periodista not in limpio
