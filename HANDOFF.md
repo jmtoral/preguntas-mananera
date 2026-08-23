@@ -16,6 +16,22 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Hecho
 
+### Resumen temático por pregunta (`temas.py`)
+
+Pedido por el humano el 2026-08-23. `src/estenograficas/temas.py` le pide a Gemini una etiqueta de 5 a 10 palabras por pregunta. Uso acotado según la regla dura 4: el modelo ve una pregunta, nunca el documento. Cada resumen lleva `metodo`, `modelo` y el fragmento exacto que se le mandó.
+
+**El prompt prohíbe explícitamente calificar la pregunta** —nada de "cuestiona", "critica", "insiste", "dura", "blanda"— y exige frase nominal. La razón no es estética: si el resumen califica y algún día aparece junto a la pregunta en una hoja de codificación, ancla al humano en el campo que más importa.
+
+**Probado sobre las 20 de la hoja de ejemplo.** 17 de 20 salieron a la primera. Las 3 que devolvieron `SIN TEMA` no estaban rotas: **no se sostienen solas**. Son repreguntas que dependen del turno anterior (`"…por eso le preguntaba"`, `"¿Y habría este reconocimiento?"`), y dos de las tres el humano las había marcado `insistencia = sí`. Mandándolas **con su contexto inmediato** —que la regla dura 4 también permite— las 3 salieron bien.
+
+**Implicación para la fase 11, que vale más que el resumen mismo:** si una fracción de las preguntas no es autocontenida, el clasificador tampoco puede verlas solas. El plan ya decía "una pregunta con su contexto inmediato"; ahora hay una razón medida para que así sea.
+
+**Un error real en 3 de 3 revisadas a mano:** el resumen de `2025-05-15-h5-t96` dice "información solicitada a Biden" cuando el texto dice que **Biden se la pidió a ella**. Dirección invertida. **Estas etiquetas sirven para navegar, no son dato analizable**, y quien las use tiene que saberlo.
+
+**Volumen si se corre sobre todo el corpus:** 22,282 preguntas, ~1.98 M tokens de entrada y ~267 K de salida. Es mucho menos que la clasificación de la fase 11, que son las mismas preguntas por 3 corridas con un prompt largo.
+
+**Decidido:** se corre **después** de que el humano codifique las 150, para que ninguna versión de la hoja de codificación lo lleve.
+
 ### Material de terceros en `assets/`
 
 El humano compartió el 2026-08-23 un archivo externo, `assets/Ranking_medios_mananeras_ene-jun_2026.xlsx`, con la instrucción de que **nunca se publique ni se comparta**. No se identifica aquí a su autoría, a propósito: nombrarla en un archivo versionado sería exactamente la fuga que se está evitando.
