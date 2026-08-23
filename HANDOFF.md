@@ -52,9 +52,19 @@ Alcance del problema: **2,149 preguntas, el 10% del total**, dicen el medio dent
 
 **Falta:** la hoja real de la fase 9 todavía no existe. Hay una de ejemplo, con seis preguntas reales, en `data/gold/EJEMPLO_hoja_de_codificacion.xlsx`, con las cuatro columnas del libro de códigos como menú desplegable. **Esas seis preguntas quedan excluidas de la muestra de oro** porque el humano ya las vio; sus ids están en el commit correspondiente.
 
-### Hallazgo 8 de la parada de la fase 6
+### La etiqueta de hablante se rompía de TRES formas, ya arregladas
 
-**269 turnos traen una etiqueta sin separar dentro del texto.** La causa: `SECRETARIO DE SALUD, DAVID KERSHENOBICH (enlace videollamada):` — el paréntesis va en minúsculas y `_ETIQUETA` exige mayúsculas, así que no casa y el turno se funde con el anterior. Mismo error silencioso que `INTERLOCUTOR`. Pendiente de arreglar junto con el resto de la parada.
+Lo encontró el humano codificando la hoja de ejemplo: dos de seis preguntas venían "mal cortadas". No era un problema de presentación sino de segmentación.
+
+`_ETIQUETA` exigía dos puntos seguidos de espacio, y el corpus trae tres variantes que rompen eso, las tres silenciosas:
+
+1. `PREGUNTA:�Bien.` — espacio duro. Ya estaba resuelto normalizando antes de segmentar.
+2. **`...CLAUDIA SHEINBAUM PARDO:Ah, ok.`** sin espacio tras los dos puntos, y `...PARDO :—` con espacio antes. **271 turnos afectados, 253 de ellos de prensa: la respuesta del gobierno quedaba metida dentro de la pregunta del periodista.** No corrompe la lectura, corrompe la unidad de análisis.
+3. `SECRETARIO DE SALUD, DAVID KERSHENOBICH (enlace videollamada):` — paréntesis en minúsculas, fuera del juego de caracteres. 35 turnos.
+
+Arreglado con un solo regex que admite espacio opcional antes y después de los dos puntos y un paréntesis final de cualquier caja, con `(?!//)` para no tragarse un `HTTPS://`.
+
+**Efecto medido sobre las 460:** turnos 64,726 → 65,092; turnos con etiqueta pegada adentro **271 → 0**; hilos 2,149 → 2,148. **Los turnos de prensa siguen siendo 27,278**, que es justo lo que debía pasar: no aparecieron preguntas nuevas, lo que se fue es la respuesta del gobierno que traían pegada.
 
 ### Parseo masivo (fase 6) — CORRIDO. **ESPERANDO REVISIÓN DEL HUMANO.**
 
@@ -489,6 +499,8 @@ Cuando dé el visto bueno, el orden es:
 | El tema del día va nulo cuando no se anuncia | 51% de las conferencias no anuncian tema. Nulo antes que inventado | 6 |
 | `assets/` completo va a `.gitignore` | Material de terceros compartido en confianza; estaba a un `git add -A` de entrar al historial | 6 |
 | La autopresentación se tacha del texto, no se excluye la pregunta | Decisión del humano. Conserva la categoría de preguntas de apertura, que es el 10% y no es como el resto | 9 |
+| La etiqueta admite espacio opcional antes y después de los dos puntos | Tres variantes reales rompían la segmentación en silencio; 253 turnos de prensa traían la respuesta del gobierno adentro | 6 |
+| Las preguntas de ejemplo se filtran para excluir las que traen otra etiqueta adentro | Aunque el bug esté arreglado, el filtro protege contra la siguiente variante que aparezca | 9 |
 | El conteo externo se usa como validación posterior, no como insumo | Si la canonicalización se construye copiando la suya, coincidir deja de ser evidencia. Misma lógica que la codificación a ciegas | 7 |
 
 ## Problemas abiertos
@@ -510,7 +522,7 @@ Cuando dé el visto bueno, el orden es:
 19. **`PREGUNTA (VIDEOLLAMADA)` se cuenta como funcionario:** 36 turnos de prensa mal clasificados. Pendiente de que el humano apruebe tratar cualquier etiqueta que empiece con `PREGUNTA` como prensa.
 20. **269 turnos de contaminación de video sobreviven** en 62 conferencias. Caen como `anonimo`, así que no ensucian el conteo de prensa, pero están en el flujo. Pendiente decidir si se filtran por etiqueta.
 21. **El `tema_dia` solo cubre el 49% y su calidad es despareja.** Sirve para agrupar a grandes rasgos, no para cruzarlo en el análisis final tal como está.
-22. **269 turnos con una etiqueta sin separar dentro del texto**, por paréntesis en minúsculas como `(enlace videollamada):`. Hallazgo 8 de la parada de la fase 6.
+22. **La hoja de ejemplo v1 se generó ANTES de implementar la redacción**, así que mostraba "Heraldo Media Group" dentro del texto y el humano codificó viéndolo. La v2 ya sale redactada. Ninguna de esas preguntas entra a la muestra de oro.
 23. **Nos faltan 231 intervenciones (31%) contra el conteo manual externo** en enero-junio de 2026. Parte es recall de identificación, parte puede ser diferencia en la unidad de conteo. Descomponerlo es tarea de la fase 7.
 24. **La hoja real de codificación no existe todavía**, solo el ejemplo. Sale en la fase 9.
 18. **El corpus tiene 27,280 turnos de prensa, no ~10 mil.** `CLAUDE.md` supone el orden de 10 mil; la estimación de costo de la fase 11 hay que rehacerla.

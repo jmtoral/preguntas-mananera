@@ -103,8 +103,23 @@ def quitar_videos(texto: str) -> tuple[str, int, int]:
 # Todo mayúsculas, al inicio de línea, terminando en dos puntos. Admite acentos,
 # dígitos, comas, puntos, paréntesis y guiones porque los cargos los traen:
 # "DIRECTOR GENERAL INSTITUTO MEXICANO DEL SEGURO SOCIAL (IMSS), ZOÉ ROBLEDO".
+# Tres formas de romper esta etiqueta, las tres encontradas en el corpus real
+# y las tres silenciosas: el turno se funde con el anterior y solo se nota
+# porque el conteo sale más bajo.
+#
+# 1. `PREGUNTA:\xa0Bien.` — espacio duro. Se resuelve normalizando antes.
+# 2. `...PARDO:Ah, ok.` y `...PARDO :—` — sin espacio después de los dos
+#    puntos, o con espacio antes. **253 turnos de prensa traían la respuesta
+#    del gobierno metida adentro** por esto.
+# 3. `SECRETARIO DE SALUD, DAVID KERSHENOBICH (enlace videollamada):` — el
+#    paréntesis viene en minúsculas y no cabía en el juego de caracteres.
+#
+# El `(?!//)` evita tragarse un `HTTPS://`, que también son mayúsculas con
+# dos puntos al inicio de línea.
 _ETIQUETA = re.compile(
-    r"^(?P<etiqueta>[A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ0-9 ,\.\(\)/º°'’\-]{2,150}?):[ \t]",
+    r"^(?P<etiqueta>[A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ0-9 ,\.\(\)/º°'’\-]{2,150}?"
+    r"(?:\s*\([^)\n]{0,45}\))?)"
+    r"[ \t]*:(?!//)[ \t]*",
     re.MULTILINE,
 )
 
