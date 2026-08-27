@@ -2,6 +2,8 @@
 
 Copia el bloque de abajo como primer mensaje al agente. Ten en el repo `CLAUDE.md`, `HANDOFF.md` y la conferencia de muestra en `fixtures/2026-08-18.txt`.
 
+> **Revisión del 2026-08-27.** Las fases 0 a 6 están hechas y el corpus está descargado, parseado y publicado en GitHub. **La fase 6 es parada obligatoria y está esperando decisiones del humano.** El estado real, con los seis puntos pendientes, vive en `HANDOFF.md`; este archivo es solo el plan.
+>
 > **Revisión del 2026-08-21.** Las fases se renumeraron. La fase 0 ya está ejecutada y el ambiente aprobado es `votaciones_corte`. Cambios respecto de la versión original: la prueba de aceptación de la fase 2 se endureció, el tema del día se extrae en la fase 6 en vez de improvisarse al final, se insertó una fase 8 de análisis descriptivo que no requiere codificación manual, la muestra de oro se recorrió a la fase 9 y la recodificación de consistencia se volvió fase propia (10). El estado real vive en `HANDOFF.md`, no aquí.
 
 ---
@@ -90,4 +92,4 @@ Su exactitud se reporta por validación cruzada y **no se compara de frente cont
 - No inventes atribuciones. Si no se sabe quién preguntó, el campo va nulo.
 - No toques mis ambientes conda sin aprobación explícita.
 
-Empieza por la fase 1.
+**No empieces por la fase 1: las fases 0 a 6 ya están hechas.** Lee `HANDOFF.md` y arranca desde "Lo primero al retomar".

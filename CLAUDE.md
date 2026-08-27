@@ -8,7 +8,7 @@ Análisis de contenido de las versiones estenográficas de las conferencias de p
 
 El producto final es un dataset defendible y un análisis, no un pipeline bonito. Si hay que elegir entre elegancia del código y trazabilidad del dato, gana la trazabilidad.
 
-Escala aproximada: unas 460 conferencias, del orden de 10 mil turnos de pregunta.
+Escala real, medida sobre el corpus completo: **460 conferencias, 65,092 turnos de habla, 27,278 turnos de prensa y 22,282 preguntas útiles** (sin saludos ni inaudibles). La estimación original de "10 mil turnos de pregunta" se quedó corta por casi el triple.
 
 ## Entorno
 

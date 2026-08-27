@@ -8,11 +8,70 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Estado
 
-**Fase actual:** 6 (parseo masivo) **CORRIDA, en PARADA OBLIGATORIA**. El corpus está parseado y los tres archivos intermedios escritos, pero **nada sigue hasta que el humano revise la lista de etiquetas**. Hay 7 hallazgos concretos esperando su decisión, en "Hecho".
-**Última actualización:** 2026-08-21, cerrando la sesión.
-**Ambiente conda:** **`votaciones_corte`**, Python 3.11.14, en `C:\Users\User\anaconda3\envs\votaciones_corte`. Aprobado por el humano el 2026-08-21 para usarse directo, sin clonar.
-**Bloqueado esperando:** (a) que el humano revise el diagnóstico de etiquetas de la fase 6 y decida sobre los 7 puntos; (b) que **respalde `data/raw/` fuera del repo** —460 archivos, 75 MB, no están en git—.
+**Fase actual:** 6 (parseo masivo) **CORRIDA y en PARADA OBLIGATORIA.** El corpus está descargado, parseado y publicado. **Nada avanza hasta que el humano decida sobre los hallazgos del diagnóstico**, listados abajo en "Lo primero al retomar".
 
+**Última actualización:** 2026-08-27.
+**Ambiente conda:** **`votaciones_corte`**, Python 3.11.14. Conda no está en el PATH; usar el intérprete por ruta absoluta: `C:/Users/User/anaconda3/envs/votaciones_corte/python.exe`. En Windows, anteponer `PYTHONIOENCODING=utf-8` o la consola destroza los acentos al imprimir (no los archivos, solo la impresión).
+**Repositorio:** https://github.com/jmtoral/preguntas-mananera — **público**, al día con `origin/main`.
+
+**Bloqueado esperando dos cosas del humano:**
+
+1. Decidir sobre los 6 puntos de la parada de la fase 6 (abajo).
+2. **Respaldar `data/raw/` fuera del repo.** 460 archivos, 75 MB, no están en git y reconstruirlos depende de que gob.mx siga sirviendo.
+
+---
+
+## Lo primero al retomar
+
+Verificar que todo sigue en pie:
+
+```bash
+cd d:/PROYECTOS_PERSONALES/preguntas_matutinas
+PYTHONIOENCODING=utf-8 "C:/Users/User/anaconda3/envs/votaciones_corte/python.exe" -m pytest -q   # 120 pruebas
+ls data/raw | wc -l                                                                              # 460
+```
+
+Lo que hay en disco (todo en `.gitignore`):
+
+| ruta | contenido |
+|---|---|
+| `data/raw/` | 460 conferencias en HTML, 75 MB, **inmutable** |
+| `data/interim/urls.jsonl` | 464 URLs descubiertas |
+| `data/interim/turnos.jsonl` | 65,092 turnos |
+| `data/interim/hilos.jsonl` | 2,148 hilos |
+| `data/interim/conferencias.jsonl` | 460, con `tema_dia` |
+| `data/gold/EJEMPLO_*.xlsx` | 2 hojas de ejemplo, **ya codificadas por el humano** |
+| `assets/` | **material de terceros. NO se publica, NO se comparte, NO se nombra su autoría en archivos versionados.** |
+
+### Los 6 puntos que esperan decisión
+
+Cinco son correcciones de etiquetas; el sexto es criterio.
+
+1. **`PREGUNTA (VIDEOLLAMADA)` → tratar como prensa.** Hoy cuenta como funcionario: 36 turnos mal clasificados. Recomendación: cualquier etiqueta que empiece con `PREGUNTA` es prensa.
+2. **Unificar las 7 grafías de la presidenta**, incluidas dos erratas de transcripción (`RESIDENTA DE MÉXICO`, `SHEINBAUM PADO`) y una sobrante de campaña (`CANDIDATA A LA PRESIDENCIA`).
+3. **`INTERVENCIÓN HOMBRE` / `INTERVENCIÓN MUJER` y su variante por videollamada → ruido**, igual que `INTERVENCIÓN`. 27 turnos.
+4. **269 turnos de contaminación de video** en 62 conferencias (`VOZ MUJER`, `NIÑA`, `BENEFICIARIA DEL PROGRAMA…`). Caen como `anonimo`, así que **no ensucian el conteo de prensa**. ¿Filtrarlos por etiqueta, o dejarlos y excluirlos en el análisis? **Criterio del humano.**
+5. **Confirmar que `(ENLACE VIDEOLLAMADA)` NO es video.** 818 apariciones. Es gente participando a distancia que sí habla en la conferencia; hoy se trata como hablante normal.
+6. **Siete conferencias sin ningún hilo:** `2025-10-03` (0 turnos de prensa, probablemente no es mañanera), `2026-05-29`, `2025-05-21`, `2024-12-18`, `2026-05-20`, `2025-04-02`, `2025-04-07`. Las dos últimas tienen 29 y 32 turnos de prensa: **ahí se están perdiendo periodistas.**
+
+Al decidir, aplicar los cambios y **volver a correr `python -m estenograficas.parseo`**, que reescribe los tres JSONL completos.
+
+### Después, la fase 7
+
+Identidad: regex sobre los primeros 300 caracteres, el modelo solo sobre lo que el regex no resuelva, y luego canonicalización. **El plan de canonicalización ya se discutió con el humano:**
+
+1. Normalización determinista: plegar acentos y mayúsculas **solo para comparar**, quitar prefijos genéricos (`revista`, `diario`, `grupo`, `periódico`).
+2. **Anclar el medio al periodista**, que es el truco que sale de mirar los datos: una persona dice su nombre igual casi siempre pero su medio de tres formas distintas (`Karina Aguilar` → `Diario 24 Horas` 27 veces, `diario 24 Horas` 9, `24 Horas` 1). Evidencia mucho más fuerte que el parecido tipográfico.
+3. Embeddings locales más clustering aglomerativo para la cola.
+4. El humano aprueba los grupos dudosos.
+
+Sobre los datos: **345 grafías de periodista** con solo 13 grupos de variantes (problema fácil, casi todo acentos) contra **560 cadenas de medio** (problema difícil: eslóganes pegados, dos medios en un turno).
+
+Trampas ya identificadas: un periodista puede representar **dos medios a la vez** (`El Chapucero y Efecto Colateral`) y puede **cambiar de medio en el tiempo** —eso es señal, no ruido, y aplanarlo borra información real, así que la canonicalización tiene que mirar la fecha o al menos marcar esos casos—. Nada se sobreescribe: lo canónico va en `periodista_canonico`, con `metodo` y `confianza`.
+
+**Meta medible:** cerrar el hueco del **31%** contra el conteo manual externo (521 nuestras contra 752 suyas en enero–junio de 2026). Parte es recall de identificación, parte puede ser diferencia en la unidad de conteo; descomponerlo es tarea de esa fase.
+
+---
 
 ## Hecho
 
@@ -74,7 +133,7 @@ Lo encontró el humano codificando la hoja de ejemplo: dos de seis preguntas ven
 
 `_ETIQUETA` exigía dos puntos seguidos de espacio, y el corpus trae tres variantes que rompen eso, las tres silenciosas:
 
-1. `PREGUNTA:�Bien.` — espacio duro. Ya estaba resuelto normalizando antes de segmentar.
+1. `PREGUNTA:\xa0Bien.` — espacio duro. Ya estaba resuelto normalizando antes de segmentar.
 2. **`...CLAUDIA SHEINBAUM PARDO:Ah, ok.`** sin espacio tras los dos puntos, y `...PARDO :—` con espacio antes. **271 turnos afectados, 253 de ellos de prensa: la respuesta del gobierno quedaba metida dentro de la pregunta del periodista.** No corrompe la lectura, corrompe la unidad de análisis.
 3. `SECRETARIO DE SALUD, DAVID KERSHENOBICH (enlace videollamada):` — paréntesis en minúsculas, fuera del juego de caracteres. 35 turnos.
 
@@ -453,16 +512,6 @@ El humano dijo el 2026-08-21 que todavía no le queda claro en qué consiste su 
 | 12 | 10 | Segundo instrumento, con embeddings locales y sin comparación directa contra el alfa |
 | 13 | 11 | Análisis de postura, encima de lo que dejó la 8 |
 
-## Siguiente paso concreto
-
-**Esperar la revisión del humano sobre los 7 puntos del diagnóstico de la fase 6.** No arrancar la fase 7 sin eso: `PROMPT.md` lo marca como parada obligatoria y esta sesión ya demostró dos veces por qué (`INTERLOCUTOR`, 421 turnos; `PREGUNTA (VIDEOLLAMADA)`, 36 más).
-
-Cuando dé el visto bueno, el orden es:
-
-1. Aplicar las correcciones de etiquetas que apruebe y **volver a correr `python -m estenograficas.parseo`**, que reescribe los tres archivos.
-2. **Respaldar `data/raw/` fuera del repo** si no lo ha hecho.
-3. Fase 7, identidad: regex sobre los primeros 300 caracteres, el modelo solo sobre lo que el regex no resuelva, y después canonicalización con embeddings más clustering. Los clusters dudosos se le muestran para que los apruebe.
-
 ## Decisiones tomadas
 
 | Decisión | Razón | Fase |
@@ -521,40 +570,49 @@ Cuando dé el visto bueno, el orden es:
 
 ## Problemas abiertos
 
-1. **gob.mx solo se deja leer con navegador VISIBLE.** Headless no pasa el reto anti-bot ni con espera de 50 s ni con parches anti-detección; headful pasa en 1.7 s. La ventana se puede mandar fuera de pantalla, pero **el pipeline no puede correr en un servidor sin escritorio**. Si algún día se mueve a uno, esto se rompe y hay que volver a Wayback.
-2. **Hay una atribución que sabemos que está mal y no se parchó.** El turno `PREGUNTA: No lo interrumpas cuando…` quedó atribuido a Hans Salazar como `propagada`. Es alguien del salón regañando a otro, no Hans. La heurística de interjecciones no lo agarra porque es un solo turno con respuesta antes y después, no una racha. **No se metió un caso especial a propósito** (`CLAUDE.md`: no parchar para que un caso raro deje de fallar). Es la clase de error que la parada obligatoria de la fase 6 existe para encontrar, y es evidencia de que la propagación hacia adelante tiene un piso de error irreducible sin juicio humano.
-3. **El hilo de Dalila Escobar tiene 62 turnos y 31 preguntas, muy por encima de los otros tres.** Puede ser real —ella misma dice "el último, tercer tema"— o puede ser que otro periodista habló sin presentarse y quedó absorbido en su hilo. No se puede distinguir sin leer. Revisar en la fase 6.
-4. **Tres turnos `INTERVENCIÓN` quedan con `texto` vacío** porque todo su contenido era un aparte (`—25—`, `—36 [por ciento] del '24 al…—`). Es correcto según el contrato, pero un texto vacío es fácil de confundir con un error de parseo cuando se vean 460 conferencias.
-5. **El fixture empieza con `ersión estenográfica`**, sin la V inicial. Es un defecto del texto de origen, no del parser. Si aparece en más archivos, la extracción del título en la fase 6 tiene que tolerarlo.
-6. **No se verificó que el otro proyecto que usa `votaciones_corte` siga funcionando** después de la instalación. El dry-run no mostró downgrades, que es evidencia buena pero no es haberlo corrido. Si `votaciones_corte` empieza a fallar en su proyecto original, empezar por aquí.
-7. **`environment.yml` lista de más.** Como `votaciones_corte` es compartido, el export trae paquetes del otro proyecto. Reconstruirlo en otra máquina da un ambiente que funciona pero más gordo que el mínimo, y con torch CPU. Si algún día importa, se recorta a mano.
-8. **Sin estimación de costo para la fase 11.** ~10 mil preguntas × 3 corridas ≈ 30 mil llamadas. Se estima antes de la fase 9, no al llegar a la 11.
-9. **La compensación del instructivo de codificación no está resuelta.** Ejemplos trabajados por el agente hacen la tarea posible pero anclan al humano a la lectura del agente. La alternativa es que el humano codifique 10 en frío primero y de ahí salga el instructivo. Se decide al llegar a la fase 9.
-10. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un `DataFrame` de pandas 3.0.1 y pasó, pero no se ha corrido nada que combine pandas 3.0 con `sentence-transformers`. Si algo truena raro en las fases 8 o 12, sospechar de aquí.
-11. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`. Anotado ahora porque en la fase 12 se va a ver como un warning ignorable y no lo es.
-15. **`data/raw/` no está respaldado.** 460 archivos, 75 MB, fuera de git. Es el activo caro y bloquea la fase 6.
-16. **Siete conferencias sin ningún hilo:** `2024-12-18`, `2025-04-02`, `2025-04-07`, `2025-05-21`, `2025-10-03`, `2026-05-20`, `2026-05-29`. No truenan; nadie se autopresenta de forma reconocible. Revisar en la fase 6.
-17. **Tres variantes de la etiqueta de la presidenta** conviven en el corpus y hay que unificarlas.
-19. **`PREGUNTA (VIDEOLLAMADA)` se cuenta como funcionario:** 36 turnos de prensa mal clasificados. Pendiente de que el humano apruebe tratar cualquier etiqueta que empiece con `PREGUNTA` como prensa.
-20. **269 turnos de contaminación de video sobreviven** en 62 conferencias. Caen como `anonimo`, así que no ensucian el conteo de prensa, pero están en el flujo. Pendiente decidir si se filtran por etiqueta.
-21. **El `tema_dia` solo cubre el 49% y su calidad es despareja.** Sirve para agrupar a grandes rasgos, no para cruzarlo en el análisis final tal como está.
-22. **La hoja de ejemplo v1 se generó ANTES de implementar la redacción**, así que mostraba "Heraldo Media Group" dentro del texto y el humano codificó viéndolo. La v2 ya sale redactada. Ninguna de esas preguntas entra a la muestra de oro.
-23. **Nos faltan 231 intervenciones (31%) contra el conteo manual externo** en enero-junio de 2026. Parte es recall de identificación, parte puede ser diferencia en la unidad de conteo. Descomponerlo es tarea de la fase 7.
-24. **La hoja real de codificación no existe todavía**, solo el ejemplo. Sale en la fase 9.
-18. **El corpus tiene 27,280 turnos de prensa, no ~10 mil.** `CLAUDE.md` supone el orden de 10 mil; la estimación de costo de la fase 11 hay que rehacerla.
-12. **La cobertura sigue siendo de cinco conferencias.** Una de 2024, una de 2025 y tres de 2026. Suficiente para haber encontrado cuatro defectos reales, insuficiente para afirmar que el parser aguanta 460. La parada obligatoria de la fase 6 sigue siendo el filtro de verdad.
-13. **Una docena de días hábiles sin conferencia que no son festivos obvios:** 2024-10-28, 2024-11-18, 2024-11-19, 2024-12-12, 2025-06-16, 2025-06-17, 2025-09-01, 2025-11-10, 2025-12-05, 2025-12-12 y 2026-04-17. Pueden ser giras o pueden existir bajo otro slug. Revisar en la fase 6.
-14. **La conferencia de Culiacán no tiene fecha en el slug.** `...-en-culiacan-sinaloa`. Es real y está en `urls.jsonl` con `conferencia_id: null`. La fase 5 tiene que sacarle la fecha del contenido, y de paso confirmar si hay más conferencias fuera de Palacio Nacional con este patrón.
+Los seis puntos de la parada de la fase 6 **no están aquí**: viven arriba, en "Lo primero al retomar", porque son decisiones pendientes y no problemas latentes.
+
+### Bloquean trabajo
+
+1. **`data/raw/` no está respaldado.** 460 archivos, 75 MB, fuera de git. Reconstruirlos son 15 minutos de navegador y depende de que gob.mx siga sirviendo. `CLAUDE.md` exige el respaldo antes de que cualquier etapa los consuma.
+2. **La hoja real de codificación no existe.** Solo las dos de ejemplo. Sale en la fase 9, y antes hay que decidir la compensación del punto 3.
+3. **La compensación del instructivo de codificación sigue sin resolverse.** El agente ya trabajó cuatro ejemplos a petición del humano, así que **el anclaje ya ocurrió parcialmente**. Falta decidir si se escribe el instructivo completo con ejemplos del agente (rápido, ancla más) o si el humano codifica 10 en frío primero (más lento, criterio propio). Las preguntas ya mostradas al humano quedan **excluidas de la muestra de oro**; sus ids están en los commits correspondientes.
+
+### Riesgos conocidos del dato
+
+4. **Una atribución que sabemos mal y NO se parchó.** El turno `PREGUNTA: No lo interrumpas cuando…` quedó atribuido a Hans Salazar; es alguien del salón regañando a otro. La heurística de interjecciones no lo agarra porque es un solo turno con respuesta antes y después. Es el piso de error irreducible de la propagación hacia adelante sin juicio humano.
+5. **El hilo de Dalila Escobar del 2026-08-18 tiene 62 turnos y 31 preguntas**, muy por encima de los otros. Puede ser real —ella dice "el último, tercer tema"— o puede que otro periodista hablara sin presentarse y quedara absorbido. No se distingue sin leer.
+6. **Nos faltan 231 intervenciones (31%)** contra el conteo manual externo en enero–junio de 2026. Parte es recall de identificación, parte puede ser diferencia en la unidad de conteo. Es la meta medible de la fase 7.
+7. **El `tema_dia` solo cubre el 49% y su calidad es despareja.** Bien: `salud`, `seguridad`. Mal: `casa llena`, `tres temas`. **No está listo para cruzarlo en el análisis final**; probablemente necesite el modelo sobre el fragmento de apertura.
+8. **Una docena de días hábiles sin conferencia que no son festivos obvios:** 2024-10-28, 2024-11-18, 2024-11-19, 2024-12-12, 2025-06-16, 2025-06-17, 2025-09-01 (día del Informe), 2025-11-10, 2025-12-05, 2025-12-12, 2026-04-17. Pueden ser giras o existir bajo otro slug.
+9. **Tres turnos `INTERVENCIÓN` quedan con `texto` vacío** porque todo su contenido era un aparte. Es correcto según el contrato, pero un texto vacío se confunde fácil con un error de parseo.
+10. **`CLAUDE.md` dice "del orden de 10 mil turnos de pregunta"** y el corpus tiene **27,278**. Corregir esa línea.
+
+### Del entorno
+
+11. **gob.mx solo se deja leer con navegador VISIBLE.** Headless no pasa el reto anti-bot ni con espera de 50 s ni con parches anti-detección. La ventana se manda fuera de pantalla, pero **el pipeline no puede correr en un servidor sin escritorio.**
+12. **No se verificó que el otro proyecto que usa `votaciones_corte` siga funcionando** después de instalarle scikit-learn, sentence-transformers, torch y playwright. El dry-run no mostró downgrades y las versiones previas salieron idénticas, pero eso no es haberlo corrido.
+13. **`environment.yml` lista de más**, porque el ambiente es compartido. Reconstruirlo da algo que funciona pero más gordo que el mínimo, y con torch en versión CPU.
+14. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`.
+15. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un DataFrame y pasó, pero no se ha combinado con `sentence-transformers`.
+16. **La cobertura de fixtures sigue siendo de cinco conferencias.** Suficiente para haber encontrado once modos de falla, insuficiente para afirmar que el parser aguanta 460 sin sorpresas.
+
+### Resueltos en esta sesión, anotados para no repetirlos
+
+- **Costo de la fase 11: medido.** ~$18 USD con `gemini-2.5-flash` en batch, tres corridas sobre 22,282 preguntas. Más de la mitad del costo de entrada es el libro de códigos repetido en cada llamada; si algún día importa, ahí está el ahorro (context caching), no en bajar de modelo.
+- **La conferencia de Culiacán resultó ser un duplicado** del 2025-07-11 publicado bajo dos URLs, no una conferencia faltante.
+- **La hoja de ejemplo v1 se generó antes de implementar la redacción**, así que mostraba el medio y el humano codificó viéndolo. La v2 ya sale redactada; ninguna de esas preguntas entra a la muestra de oro.
 
 ## Cómo retomar
 
+Todo lo necesario está en "Estado" y "Lo primero al retomar", arriba. En corto:
+
 ```bash
 cd d:/PROYECTOS_PERSONALES/preguntas_matutinas
-conda activate votaciones_corte   # conda no está en el PATH; usar C:\Users\User\anaconda3\Scripts\conda.exe
-pytest -q
+PYTHONIOENCODING=utf-8 "C:/Users/User/anaconda3/envs/votaciones_corte/python.exe" -m pytest -q
 ```
 
-Luego leer `CLAUDE.md`, leer este archivo, y continuar desde "siguiente paso concreto".
+Leer `CLAUDE.md` (reglas del proyecto), luego este archivo desde arriba. **No avanzar a la fase 7 sin que el humano resuelva los 6 puntos de la parada.**
 
 ---
 
