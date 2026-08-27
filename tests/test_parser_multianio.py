@@ -295,3 +295,58 @@ def test_ningun_periodista_del_corpus_arrastra_muletilla() -> None:
             continue
         for h in parsear_archivo(ruta).hilos:
             assert h.periodista.split()[0] not in malas, (ruta.stem, h.periodista)
+
+
+def test_la_presentacion_puede_empezar_a_media_oracion() -> None:
+    """`Por cierto, soy X, de Y` — solo cuando hay muletilla explícita.
+
+    Sin muletilla el ancla sigue siendo el inicio de oración, porque ahí es
+    donde vive el falso positivo de López Beltrán.
+    """
+    from estenograficas.parser import identidad_declarada
+
+    assert identidad_declarada(
+        "Muchas gracias. Por cierto, soy Gregorio Varela, de Cinco Radio. No me presenté."
+    ) == ("Gregorio Varela", "Cinco Radio")
+    assert identidad_declarada(
+        'Presidenta con "A", su servidor Carlos Pozos, reportero de Lord Molécula.'
+    ) == ("Carlos Pozos", "Lord Molécula")
+
+
+def test_conectores_alternativos_al_de() -> None:
+    """`para` en vez de `de`, y un `soy` colado antes del oficio."""
+    from estenograficas.parser import identidad_declarada
+
+    assert identidad_declarada("Gracias. Manuel Pedrero, para Los Reporteros MX.") == (
+        "Manuel Pedrero", "Los Reporteros MX")
+    assert identidad_declarada(
+        "Hola. Olga Ojeda Lajud, soy corresponsal del Diario del Istmo."
+    ) == ("Olga Ojeda Lajud", "Diario del Istmo")
+    assert identidad_declarada(
+        "Bienvenida. Mi nombre es Yadira Llaven, soy reportera de La Jornada de Oriente."
+    ) == ("Yadira Llaven", "La Jornada de Oriente")
+
+
+def test_el_ancla_suave_no_abre_la_puerta_a_la_prosa() -> None:
+    """La coma solo cuenta como ancla si viene una muletilla detrás."""
+    from estenograficas.parser import identidad_declarada
+
+    assert identidad_declarada("Preguntar por Israel Vallarta, Presidenta.") is None
+    assert identidad_declarada("Se trata de Marina del Pilar, de Baja California.") is None
+    assert identidad_declarada(
+        "Se acusa a Andrés Manuel López Beltrán, de encabezar una red de huachicol."
+    ) is None
+
+
+def test_ningun_periodista_del_corpus_parece_prosa() -> None:
+    """Barrido: ningún nombre debe contener `del` / `de la` / `de los`."""
+    import re
+
+    from estenograficas.parser import parsear_archivo
+
+    prosa = re.compile(r"\b(?:del|de la|de los)\b")
+    for ruta in sorted(config.paths().fixtures.iterdir()):
+        if ruta.suffix.lower() not in (".html", ".txt"):
+            continue
+        for h in parsear_archivo(ruta).hilos:
+            assert not prosa.search(h.periodista), (ruta.stem, h.periodista)

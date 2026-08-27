@@ -379,17 +379,30 @@ _OFICIO = (
 # como "Soy Jonás".
 _PALABRA_NOMBRE = r"[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+"
 _MEDIO = r"(?P<medio>[^\.\!\?\n]{2,70}?)\s*[\.\!\?]"
-_CONECTOR = r"\s*,\s*(?:" + _OFICIO + r"\s+)?(?:de|del)\s+(?:la\s+|el\s+)?"
+
+# El conector admite `de`, `del` y `para` (`Manuel Pedrero, para Los Reporteros`
+# aparece 41 veces), y deja pasar un `soy` antes del oficio
+# (`Olga Ojeda Lajud, soy corresponsal del Diario del Istmo`).
+_CONECTOR = (
+    r"\s*,\s*(?:soy\s+)?(?:" + _OFICIO + r"\s+)?(?:de|del|para)\s+(?:la\s+|el\s+)?"
+)
+
+# Con muletilla explícita, la presentación puede empezar a media oración:
+# `Por cierto, soy Gregorio Varela, de Cinco Radio`, `Presidenta con "A", su
+# servidor Carlos Pozos`. Sin muletilla el ancla sigue siendo el inicio de
+# oración, porque ahí es donde vive el falso positivo de López Beltrán.
+_ANCLA_SUAVE = r"(?:^|(?<=[\.\!\?])\s|(?<=[,;:])\s|^\s*)"
+_ANCLA_DURA = r"(?:^|(?<=[\.\!\?])\s|^\s*)"
 
 _IDENTIDAD = re.compile(
-    r"(?:^|(?<=[\.\!\?])\s|^\s*)"
     r"(?:"
-    #  a) con muletilla: el nombre puede ser de una sola palabra
-    + _MULETILLA + r"(?P<nombre>" + _PALABRA_NOMBRE + r"(?:\s+(?:de|del|la|los)\s+)?"
+    #  a) con muletilla: ancla suave y el nombre puede ser de una sola palabra
+    + _ANCLA_SUAVE + _MULETILLA
+    + r"(?P<nombre>" + _PALABRA_NOMBRE + r"(?:\s+(?:de|del|la|los)\s+)?"
     r"(?:\s*" + _PALABRA_NOMBRE + r"){0,3})"
     r"|"
-    #  b) sin muletilla: se exigen dos o más palabras
-    r"(?P<nombre2>" + _NOMBRE + r")"
+    #  b) sin muletilla: ancla dura y se exigen dos o más palabras
+    + _ANCLA_DURA + r"(?P<nombre2>" + _NOMBRE + r")"
     r")"
     + _CONECTOR + _MEDIO,
     re.MULTILINE,
