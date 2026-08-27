@@ -355,17 +355,43 @@ _NOMBRE = r"[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+(?:\s+(?:de|del|la|los)\s+)?(?:
 # del nombre ("Soy Yesenia Peralta") y "Su servidor, Carlos Pozos, de LM
 # Noticias" no se detecta en absoluto, porque el nombre no arranca la oración.
 # Las cinco formas salieron de las conferencias de 2024, 2025 y 2026.
+# Se admiten UNA O DOS muletillas seguidas: `Soy su servidor, Carlos Pozos…`
+# es una sola presentación, no dos. Con una sola alternativa el regex no casa
+# y el hilo entero de esa persona se le acredita al periodista anterior.
 _MULETILLA = (
-    r"(?:(?:[Ss]oy|[Ss]u\s+servidor|[Mm]i\s+nombre\s+es|[Ll]es?\s+habla|"
-    r"[Aa]quí)\s*,?\s+)?"
+    r"(?:(?:[Ss]oy|[Ss]u\s+servidora?|[Mm]i\s+nombre\s+es|[Ll]es?\s+habla|"
+    r"[Aa]quí)\s*,?\s+){1,2}"
 )
+
+# El oficio se mete entre el nombre y el medio: `Carlos Pozos, reportero de LM
+# Noticias`, `Aurora Castillejos, reportera de Canal 14`. Exigir `, de` pegado
+# al nombre pierde esas presentaciones enteras.
+_OFICIO = (
+    r"(?:reporter[oa]|corresponsal|conductor[a]?|periodista|colaborador[a]?|"
+    r"director[a]?|editor[a]?|enviad[oa]\s+especial|columnista|"
+    r"analista|comentarista)"
+)
+
+# Un nombre de una sola palabra solo se acepta si viene precedido de muletilla
+# explícita (`Soy Jonás`). Sin ese ancla, aceptar nombres de una palabra
+# dispara falsos positivos por todo el texto. Y sin esta rama, el regex lee
+# `Soy Jonás` como un nombre de dos palabras y el periodista queda registrado
+# como "Soy Jonás".
+_PALABRA_NOMBRE = r"[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+"
+_MEDIO = r"(?P<medio>[^\.\!\?\n]{2,70}?)\s*[\.\!\?]"
+_CONECTOR = r"\s*,\s*(?:" + _OFICIO + r"\s+)?(?:de|del)\s+(?:la\s+|el\s+)?"
+
 _IDENTIDAD = re.compile(
     r"(?:^|(?<=[\.\!\?])\s|^\s*)"
-    + _MULETILLA
-    + r"(?P<nombre>" + _NOMBRE + r")"
-    r"\s*,\s*(?:de|del)\s+(?:la\s+|el\s+)?"
-    r"(?P<medio>[^\.\!\?\n]{2,70}?)"
-    r"\s*[\.\!\?]",
+    r"(?:"
+    #  a) con muletilla: el nombre puede ser de una sola palabra
+    + _MULETILLA + r"(?P<nombre>" + _PALABRA_NOMBRE + r"(?:\s+(?:de|del|la|los)\s+)?"
+    r"(?:\s*" + _PALABRA_NOMBRE + r"){0,3})"
+    r"|"
+    #  b) sin muletilla: se exigen dos o más palabras
+    r"(?P<nombre2>" + _NOMBRE + r")"
+    r")"
+    + _CONECTOR + _MEDIO,
     re.MULTILINE,
 )
 
@@ -407,7 +433,8 @@ def identidad_declarada(texto: str) -> tuple[str, str] | None:
     if not m:
         return None
     medio = re.sub(r"\s+", " ", m.group("medio")).strip(" ,;")
-    return m.group("nombre").strip(), medio
+    nombre = m.group("nombre") or m.group("nombre2")
+    return " ".join(nombre.split()), medio
 
 
 # ---------------------------------------------------------------------------

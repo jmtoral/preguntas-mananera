@@ -227,3 +227,71 @@ def test_si_los_dos_lados_parecen_cargo_no_se_invierte() -> None:
     )
     assert cargo == "SECRETARIO DE MARINA"
     assert quien == "ALMIRANTE RAYMUNDO PEDRO MORALES"
+
+
+# ===========================================================================
+# Autopresentaciones que se perdían y acreditaban el hilo a otra persona
+# ===========================================================================
+# Las tres las encontró el humano leyendo una conferencia parseada. No fallaban
+# ruidosamente: el hilo entero de una persona quedaba acreditado al periodista
+# anterior, que es peor que dejarlo nulo. 12 casos confirmados en el corpus.
+
+
+def test_dos_muletillas_seguidas_son_una_sola_presentacion() -> None:
+    """`Soy su servidor, X` — el regex solo admitía una muletilla."""
+    from estenograficas.parser import identidad_declarada
+
+    assert identidad_declarada(
+        "Bien, no me presenté, Presidenta. Soy su servidor, Carlos Pozos, "
+        "reportero de LM Noticias."
+    ) == ("Carlos Pozos", "LM Noticias")
+
+
+def test_el_oficio_puede_ir_entre_el_nombre_y_el_medio() -> None:
+    """`Carlos Pozos, reportero de LM Noticias` — se exigía `, de` pegado."""
+    from estenograficas.parser import identidad_declarada
+
+    casos = [
+        ("Carlos Pozos, reportero de LM Noticias.", "Carlos Pozos", "LM Noticias"),
+        ("Aurora Castillejos, reportera de Canal 14 SPR.", "Aurora Castillejos", "Canal 14 SPR"),
+        ("Soy Ana Ruiz, corresponsal de El Sur.", "Ana Ruiz", "El Sur"),
+    ]
+    for texto, nombre, medio in casos:
+        assert identidad_declarada(texto) == (nombre, medio), texto
+
+
+def test_un_nombre_de_una_palabra_solo_cuenta_tras_muletilla() -> None:
+    """`Soy Jonás, de Siker` daba el periodista "Soy Jonás".
+
+    Con muletilla explícita el nombre de una palabra es legítimo; sin ella se
+    exigen dos o más, o el regex encontraría nombres por todo el texto.
+    """
+    from estenograficas.parser import identidad_declarada
+
+    assert identidad_declarada("Hola. Soy Jonás, de Siker.") == ("Jonás", "Siker")
+    # sin muletilla, una sola palabra no basta
+    assert identidad_declarada("Hola. Jonás, de Siker.") is None
+
+
+def test_el_ancla_de_oracion_sigue_filtrando_el_falso_positivo() -> None:
+    """La flexibilidad nueva no debe reabrir el caso de López Beltrán."""
+    from estenograficas.parser import identidad_declarada
+
+    assert identidad_declarada(
+        "Se acusa a Andrés Manuel López Beltrán, de encabezar una red de huachicol."
+    ) is None
+    assert identidad_declarada(
+        "…a Estados Unidos, de Cambridge Analytica, precisamente de la manipulación."
+    ) is None
+
+
+def test_ningun_periodista_del_corpus_arrastra_muletilla() -> None:
+    """Barrido sobre las cinco conferencias de muestra."""
+    from estenograficas.parser import parsear_archivo
+
+    malas = {"Soy", "Su", "Mi", "Le", "Les", "Aquí", "Servidor", "Servidora"}
+    for ruta in sorted(config.paths().fixtures.iterdir()):
+        if ruta.suffix.lower() not in (".html", ".txt"):
+            continue
+        for h in parsear_archivo(ruta).hilos:
+            assert h.periodista.split()[0] not in malas, (ruta.stem, h.periodista)
