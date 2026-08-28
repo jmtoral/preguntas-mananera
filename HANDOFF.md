@@ -14,6 +14,8 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 **Ambiente conda:** **`votaciones_corte`**, Python 3.11.14. Conda no está en el PATH; usar el intérprete por ruta absoluta: `C:/Users/User/anaconda3/envs/votaciones_corte/python.exe`. En Windows, anteponer `PYTHONIOENCODING=utf-8` o la consola destroza los acentos al imprimir (no los archivos, solo la impresión).
 **Repositorio:** https://github.com/jmtoral/preguntas-mananera — **público**, al día con `origin/main`.
 
+**Además: hay una corrida de clasificación temática EN MARCHA** (`scripts/clasificar_temas.py`). Es reanudable y el checkpoint es durable; si murió, relanzarla y después correr `scripts/reconstruir_temas.py`. Detalle completo en "Clasificación temática en dos niveles".
+
 **Bloqueado esperando dos cosas del humano:**
 
 1. Decidir sobre los 6 puntos de la parada de la fase 6 (abajo).
@@ -111,6 +113,57 @@ Trampas ya identificadas: un periodista puede representar **dos medios a la vez*
 ---
 
 ## Hecho
+
+### Clasificación temática en dos niveles — EN MARCHA
+
+Trabajo del 2026-08-27. **Hay una corrida larga en curso**; si esta sesión murió, retomarla es un comando.
+
+**Diseño, ya decidido y probado.**
+
+- **Nivel 1 `categoria`:** una de 18, lista cerrada, en `data/interim/taxonomia_temas_candidata.json`. Es lo que se tabula. Probado dos veces: 190/190 y 400/400 clasificadas sin una sola categoría fuera de lista.
+- **Nivel 2 `asunto`:** el caso concreto con nombres (`"Diálogo con Trump sobre acusaciones Rocha Moya"`). Es lo que permite seguir una historia en el tiempo.
+- **La consolidación de asuntos es sobre TODO el corpus, no por mes.** Decisión del humano. Un caso vive semanas y cruza de mes a mes; consolidar por mes lo partiría y volvería invisible cuánto dura un tema, que es de lo más interesante que este dataset puede medir.
+
+**Cómo se llegó ahí, para no repetir los callejones sin salida:**
+
+1. Etiqueta libre por pregunta: **funciona** (17/20 a la primera; las 3 que fallaron eran repreguntas que no se sostienen solas, y con su contexto salieron). Pero da ~22 mil cadenas únicas: sirve para navegar, no para tabular.
+2. **Agrupar con embeddings locales: FALLÓ.** Con las etiquetas, el grupo mayor se tragó el 23%; con las preguntas completas, el 59%. Todas estas frases son "asunto gubernamental en español" y la distancia coseno no distingue seguridad de infraestructura dentro de un mismo campo semántico. **No reintentar esto para temas.** Ojo: eso también matiza la fase 7 —los embeddings ahí probablemente sí sirvan porque `Diario 24 Horas` / `24 Horas` son paráfrasis, que es lo que estos modelos hacen bien— pero ya no darlo por sentado sin medir.
+3. **Inducir la taxonomía con el modelo: FUNCIONÓ.** 18 categorías, cero "otros", 47 segundos con flash. Abstraer temas es lo que un LLM hace bien y la distancia coseno no.
+4. **Convergencia de asuntos:** en muestra dispersa en 23 meses solo el 9% cae en un asunto repetido; **en un mes completo sube a 38%, y a 42% fusionando casi-duplicados.** La prueba dispersa estaba mal diseñada: preguntas de años distintos no pueden compartir caso.
+
+**Dónde está todo:**
+
+| ruta | qué es |
+|---|---|
+| `src/estenograficas/temas_dos_niveles.py` | el módulo: clasificar, consolidar, reconstruir |
+| `src/estenograficas/temas.py` | etiqueta libre (el primer intento, sigue sirviendo) |
+| `scripts/clasificar_temas.py` | corre el corpus. **Reanudable** |
+| `scripts/reconstruir_temas.py` | rearma el jsonl desde el checkpoint, sin API |
+| `data/interim/taxonomia_temas_candidata.json` | las 18 categorías con nombre humano y de máquina |
+| `data/interim/temas_dos_niveles.jsonl` | la salida |
+| `data/interim/vocab_asuntos.json` | memoria de asuntos entre corridas |
+| `data/interim/temas_muestra_200.jsonl` | las 190 etiquetas libres de la prueba |
+| `data/checkpoints/temas_dos_niveles.*` | **la fuente de verdad** |
+
+**Para retomar:**
+
+```bash
+python scripts/clasificar_temas.py     # retoma desde el checkpoint, no repaga lo hecho
+python scripts/reconstruir_temas.py    # SIEMPRE al terminar
+```
+
+**Por qué existe la reconstrucción.** El checkpoint hace `fsync` por renglón; el `.jsonl` se vacía cada 50. Medido: 12 renglones de desfase. Al reanudar se saltarían por estar en `procesados()` y **faltarían para siempre**. El checkpoint guarda `categoria` y `asunto` —lo que cuesta dinero— y el fragmento se recupera de `hilos.jsonl` gratis.
+
+**Universo que se está clasificando: 12,299 preguntas, no 22,282.** El filtro toma solo las de 120 a 1,500 caracteres. **Esa decisión se heredó de una prueba y no está pensada:** hay preguntas reales de menos de 120 caracteres. Hay que decidir si se clasifica esa cola o se declara fuera del universo de análisis, y decirlo en la metodología. Costo estimado con el filtro actual: ~$2.50 USD y algo más de una hora.
+
+**Pendientes de esta línea:**
+
+- Correr la consolidación (`consolidar()`) cuando termine, y **mostrarle al humano los grupos grandes para que los apruebe**.
+- Decidir la cola de preguntas cortas.
+- Un asunto salió con una palabra en inglés (`Impunity Alejandro Moreno Cárdenas`). Vigilar si se repite.
+- Los porcentajes estimados de la taxonomía **no sirven**: el modelo estimó 6% para relaciones internacionales y en mayo de 2026 fueron 16.5%. No es defecto de la taxonomía, es que la agenda cambia mes a mes — que es justo lo que hay que medir.
+
+
 
 ### Resumen temático por pregunta (`temas.py`)
 
