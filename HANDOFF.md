@@ -8,7 +8,7 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Estado
 
-**Última actualización:** 2026-08-28. Sesión cerrada por presupuesto de API, no por error.
+**Última actualización:** 2026-08-28, tarde. **La clasificación temática terminó**: 12,135 de 12,299 preguntas (98.7%), 164 rechazadas. Los asuntos ya están consolidados y el algoritmo que los consolida se corrigió (traía un defecto de fusión por cadenas, ver abajo).
 
 **Ambiente:** `votaciones_corte`, Python 3.11. Conda no está en el PATH; usar el intérprete por ruta:
 `C:/Users/User/anaconda3/envs/votaciones_corte/python.exe`. En Windows anteponer `PYTHONIOENCODING=utf-8` o la consola destroza los acentos al imprimir (los archivos están bien, es solo la impresión).
@@ -25,7 +25,7 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ```bash
 cd d:/PROYECTOS_PERSONALES/preguntas_matutinas
-PYTHONIOENCODING=utf-8 "C:/Users/User/anaconda3/envs/votaciones_corte/python.exe" -m pytest -q   # 129
+PYTHONIOENCODING=utf-8 "C:/Users/User/anaconda3/envs/votaciones_corte/python.exe" -m pytest -q   # 136
 ```
 
 **Y antes de nada, verificar que no quedó un proceso vivo de ayer:**
@@ -36,47 +36,107 @@ ps -W | grep -c votaciones_corte      # debe ser 0
 
 El 2026-08-28 la sesión se reinició y el Python de Windows **no murió con ella**: hubo dos procesos escribiendo al mismo checkpoint. No rompió nada —0 truncadas, 0 duplicados— pero duplica el gasto de API.
 
-### Las tres cosas pendientes, en orden
+### Las cuatro cosas pendientes, en orden
 
-**1. Terminar la clasificación temática.** Va en **3,065 de 12,299 (25%)**. Ya es concurrente y corre a ~2.5 preguntas/segundo, así que lo que falta es **cerca de una hora** y unos **2 dólares**.
+**1. Los 6 puntos de la parada de la fase 6**, más la decisión sobre presentaciones tardías. Siguen sin resolverse y **bloquean la fase 7**. Es lo único que hoy detiene el proyecto; todo lo demás es trabajo que se puede hacer en paralelo.
 
-```bash
-python scripts/clasificar_temas.py     # retoma del checkpoint, no repaga nada
-python scripts/reconstruir_temas.py    # SIEMPRE al terminar
-```
+**2. Canonizar los nombres de medio.** Son ~620 cadenas crudas y el problema es real, no cosmético: Carlos Guzmán dice su medio de **11 formas distintas**, alternando `Quatro` y `Cuatro`. El contraste externo del 2026-08-28 confirmó que **una lectora experta tropieza con el mismo problema** —su tabla por medio es inconsistente con su propia tabla por periodista justo en ese caso—, así que no hay atajo por consulta. El eje confiable mientras tanto es el **periodista**, donde coincidimos perfecto. Ver `assets/cotejo_conteos_2026-08-28.md`.
 
-**2. Consolidar los asuntos y enseñarle los grupos grandes al humano.** `consolidar()` ya está escrita. **No dar por buenos los conteos de nivel 2 antes de esto.**
+**3. Revisar a mano los 620 grupos de consolidación.** Aplazado explícitamente por el humano el 2026-08-28. El defecto que hacía urgente esta revisión ya se corrigió en el código (ver abajo), así que lo que queda es control de calidad, no reparación. Empezar por los grupos grandes: `python scripts/consolidar_asuntos.py --minimo 6`.
 
-**3. Los 6 puntos de la parada de la fase 6**, más la decisión sobre presentaciones tardías. Siguen sin resolverse y bloquean la fase 7.
+**4. La muestra de oro.** Sigue sin arrancar y sigue siendo el cuello de botella metodológico: nada de la fase 9 en adelante significa algo sin ella. Necesita el instructivo de codificación con ejemplos trabajados **tomados de fuera de las 150 muestreadas**.
 
-### Hallazgo del 2026-08-28 que cambia lo que promete el nivel 2
+### Cerrado el 2026-08-28: qué promete el nivel 2, medido sobre el corpus completo
 
-Medido sobre las 3,065 clasificadas: **2,463 asuntos distintos, de los cuales el 92% aparece en UNA sola conferencia.** Solo 196 (8%) cruzan a una segunda, y apenas 80 duran más de 7 días.
+La pregunta quedó respondida y la respuesta es que **el nivel 2 no mide duración de una historia**.
 
-Es decir: **el asunto está capturando "el tema de esta tanda", no "una historia que vive semanas".** Cuando Dalila Escobar repite 7 veces `"Acuerdo Fiscalías México-Estados Unidos"`, las 7 son del **mismo día**.
+| | asuntos | en UNA sola conferencia |
+|---|---:|---:|
+| crudos, como los produjo el modelo | 9,795 | **93%** |
+| consolidados con union-find (defectuoso) | 8,522 | 90% |
+| **consolidados con el algoritmo corregido** | **8,862** | **89%** |
 
-Eso no invalida el nivel 2 —sigue sirviendo para navegar y para ver de qué habla cada periodista— pero **sí desmiente la promesa de medir cuánto dura un tema en la conferencia**, que fue el argumento con el que se eligió la opción B de consolidación. Hay que decidir si:
+Consolidar mueve el número tres puntos. No lo cambia de naturaleza. **El asunto captura "el tema de esa tanda", no una historia que vive semanas**, y ese era el argumento con el que se eligió la opción B. La reetiquetación es la salida honesta: el nivel 2 sirve para navegar el corpus y para ver de qué habla cada periodista, no para medir cuánto dura un tema.
 
-- la consolidación posterior sí junta los casos que hoy quedan separados por nombres distintos, y entonces la promesa se recupera; o
-- el nivel 2 se reetiqueta como "tema de la tanda" y la duración de una historia se mide de otra forma.
+Lo que sí queda, y es útil: **796 asuntos que abarcan siete días o más**. Ésos sí son historias seguibles, y son el subconjunto sobre el que tiene sentido preguntar por duración.
 
-**Medirlo es lo primero que hay que hacer después de consolidar**, comparando el 8% de ahora contra el de después.
+### El defecto de `consolidar()` y su corrección
+
+La versión original usaba **union-find**, que fusiona por cadenas: si A se parece a B y B a C, los tres quedan en el mismo grupo aunque A y C no compartan una sola palabra.
+
+Medido sobre el corpus completo: 6 grupos encadenados de 502, pero **uno tenía 204 miembros** y pegaba *Regulación de redes sociales* con *Reclutamiento del crimen organizado* a través de la frase puente `Regulación redes sociales crimen organizado`. Jaccard entre los extremos: **0.00**. Un grupo así envenena cualquier conteo por asunto sin dar ninguna señal de que algo salió mal.
+
+**La corrección: cada miembro se compara contra el representante del grupo, no contra un vecino cualquiera.** Se recorre de más frecuente a menos frecuente; a frecuencia igual, alfabéticamente, para que el mapa sea determinista.
+
+| | union-find | corregido |
+|---|---:|---:|
+| grupos que fusionan | 502 | **620** |
+| grupos encadenados | 6 | **0** |
+| grupo más grande | 204 variantes | **14** |
+| tiempo sobre el corpus | >120 s | **10 s** |
+
+Fusiona **más** grupos, no menos: el encadenamiento estaba absorbiendo casos distintos en pocos grupos gigantes y por eso el total salía más bajo.
+
+El salto de velocidad viene de un **índice invertido** palabra → representantes. Jaccard ≥ 0.5 exige al menos una palabra en común, así que solo hay que mirar a los representantes que comparten alguna. El resultado es idéntico al de la comparación exhaustiva porque los candidatos se recorren en orden de inserción.
+
+Siete pruebas nuevas en `tests/test_temas.py`, incluida `test_no_encadena_por_una_frase_puente`, que reproduce el caso exacto, y `test_todo_miembro_se_parece_a_su_representante`, que es el invariante que la versión anterior no cumplía. `scripts/consolidar_asuntos.py` vuelve a verificar ese invariante con un `assert` en cada corrida.
 
 ---
 
 ## Hecho
 
-### Clasificación temática — DETENIDA por presupuesto el 2026-08-28
+### Conteo de palabras: hallazgo con su confusor medido (2026-08-28)
 
-**3,065 preguntas clasificadas de 12,299 (25%). 45 rechazadas. Todo guardado y reconstruido.**
+Se puede contar cuánto habla cada quien sin clasificar nada. Sobre el corpus completo:
 
-Se paró porque al humano se le acabó el presupuesto de API, no por un error.
+| | palabras |
+|---|---:|
+| pregunta la prensa | 1,220,267 |
+| responde la presidenta | 2,072,415 |
+| otros funcionarios | 532,244 |
 
-**Para retomar, dos comandos:**
+Razón global **1.70** (solo la presidenta), 2.13 contando a todo el gobierno.
+
+**El primer resultado, sobre 40 periodistas con 8 conferencias o más, parecía un hallazgo de trato diferencial:** la razón va de 0.71 (Demian Duarte) a 3.23 (Carlos Navarro), 4.5 a 1. **Está mal leído así.**
+
+| correlación con la razón | r |
+|---|---:|
+| largo de la **pregunta** | **−0.68** |
+| largo de la **respuesta** | +0.34 |
+
+La razón la gobierna el **denominador**. Y el denominador se mueve más: las preguntas van de 30 a 114 palabras (factor 3.8), las respuestas de 61 a 140 (factor 2.3). **Ordenar por razón es en buena medida ordenar por quién habla más al preguntar.** Demian Duarte aparece último porque hace las preguntas más largas de los 40, no porque lo traten mal.
+
+**La medida que sí aguanta es palabras por respuesta**, que no depende del estilo de quien pregunta y aun así varía 2.3 veces: de 61 (Judith Sánchez Reyes) a 140 (Manuel Pedrero), mediana 93.
+
+**Y aun ésa no mide trato preferente.** Faltan tres controles, anotados para que nadie salte el paso: el **tema** (una pregunta técnica de salud obliga a respuesta larga sin que sea deferencia), el **número de preguntas por tanda** (quien acumula cinco recibe una sola respuesta para las cinco y su promedio por turno sube), y **a quién le dan la palabra**, que no es aleatorio. Una respuesta larga puede ser atención, evasión o clase magistral, y sin `postura` clasificada el largo no distingue entre las tres.
+
+Datos en `data/outputs/razon_palabras.json`.
+
+### Artefacto de exploración
+
+`data/outputs/quien_pregunta.html`, publicado. Cuatro secciones: quién pregunta y cada cuándo, de qué pregunta cada quien (40 periodistas, categorías y asuntos consolidados), cuánto contesta la presidenta (bruto, por turno y la dispersión del confusor), y el cruce con publicidad oficial.
+
+**Es exploración, no producto final.** Ninguna pregunta está clasificada por postura, así que el artefacto solo cruza dinero y palabras contra **frecuencia**, nunca contra dureza. Cada sección lleva su advertencia escrita.
+
+Los generadores viven en el scratchpad de la sesión, no en `scripts/`: dependen de material que no debe entrar al repo y de números de una sola corrida. Si el artefacto se vuelve producto, hay que reescribirlos en `src/`.
+
+### Clasificación temática — TERMINADA el 2026-08-28
+
+**12,135 preguntas clasificadas de 12,299 (98.7%). 164 rechazadas (1.3%). Reconstruido y consolidado.**
+
+Corrió en dos tramos, con una pausa a la mitad por presupuesto de API. El segundo tramo hizo 9,070
+preguntas en 2,793 s, o sea **3.2 preguntas por segundo**.
+
+Las 164 rechazadas no se descartaron en silencio: viven en
+`data/checkpoints/temas_dos_niveles.rechazos.jsonl` con su razón. Queda pendiente decidir si se
+reintentan; son el 1.3% y no cambian ninguna proporción, pero la regla dura 3 dice que nada se tira.
+
+**Los tres comandos, en este orden:**
 
 ```bash
 python scripts/clasificar_temas.py     # retoma desde el checkpoint, no repaga nada
-python scripts/reconstruir_temas.py    # SIEMPRE al terminar
+python scripts/reconstruir_temas.py    # SIEMPRE al terminar: el checkpoint es la verdad
+python scripts/consolidar_asuntos.py   # DESPUÉS de reconstruir, nunca antes
 ```
 
 **Ya es concurrente.** Se midió que agrandar el lote no servía —10 preguntas tardan 15 s y 25 tardan 33 s, o sea ~1.4 s por pregunta pase lo que pase— porque el cuello es la **salida**, que el modelo escribe token por token. Solapar peticiones sí sirve: `clasificar_paralelo()` con 6 trabajadores pasó de **0.45 a 2.5 preguntas por segundo, 5.5 veces más rápido.** Lo que falta debería tomar ~1 hora, no 7.
@@ -85,7 +145,7 @@ python scripts/reconstruir_temas.py    # SIEMPRE al terminar
 
 **Un susto que salió bien.** Al reiniciarse la sesión el Python de Windows no murió con ella, y por unos minutos hubo **dos procesos escribiendo al mismo checkpoint**. Resultado: 0 líneas truncadas y 0 ids duplicados. El registro append-only con `fsync` por renglón aguantó escritores concurrentes. (Nota operativa: `taskkill` quiere el WINPID, cuarto campo de `ps -W`, no el PID de bash.)
 
-**Pendiente inmediato al retomar:** terminar la corrida, correr `consolidar()` sobre todo el corpus y **mostrarle al humano los grupos grandes para que los apruebe**.
+**El orden importa.** `reconstruir_temas.py` reescribe `temas_dos_niveles.jsonl` desde el checkpoint, así que borra cualquier campo que se le haya agregado después. Por eso la consolidación **no toca ese archivo**: deja su mapa aparte, en `data/interim/mapa_consolidacion.json`. El asunto crudo que produjo el modelo se conserva siempre y la consolidación se puede rehacer con otro umbral sin volver a pagar clasificación.
 
 ### Clasificación temática en dos niveles — el diseño
 
@@ -179,6 +239,34 @@ Ojo al interpretar el 31%: **no se puede atribuir todo a falta de recall todaví
 En el top la forma coincide razonablemente: Heraldo Media Group y Noticiero en Redes empatados arriba, luego Contralínea y Revista Fortuna. Revista Fortuna cuadra exacto (20 y 20). Las diferencias grandes (`Diario Basta`, `Grupo Imagen (Excélsior)`) son en parte de mi agrupación burda, no necesariamente datos faltantes.
 
 **Cómo se usa, decidido:** como **validación posterior**, nunca como insumo. Si construimos nuestra canonicalización copiando la suya, coincidir deja de ser evidencia de nada. Es la misma lógica que la codificación a ciegas y que los embeddings locales de la fase 12.
+
+### Segundo contraste externo (2026-08-28): las tandas coinciden 10 de 10
+
+La misma fuente compartió un segundo conteo, ahora sobre **todo el periodo**, por medio y por periodista. Está en `assets/orientacion_externa_2026-08-28.csv` y el cotejo completo en `assets/cotejo_conteos_2026-08-28.md`. **Ambos están en `.gitignore` y no se citan con atribución en ningún lado.**
+
+**El resultado fuerte: las tandas coinciden exactamente en los 10 periodistas.** Nancy Flores 64 y 64, Hans Salazar 64 y 64, Yareth Arciniega 57 y 57, Carlos Navarro 54 y 54, Arturo Pavón 51 y 51, Carlos Guzmán 48 y 48, Yusbel Carolina 44 y 44, Karina Aguilar 36 y 36, Liliana Noble 35 y 35, Zeltzin Juárez 34 y 34. Diez de diez, sin una diferencia.
+
+Es la mejor validación externa que tiene el parser. Confirma tres cosas caras: que los hilos se cortan donde deben, que la identidad se propaga bien dentro del hilo, y que la canonización de **nombres de persona** no está partiendo a nadie en dos.
+
+**Las preguntas no coinciden, pero el hueco está acotado.** Sobre esos mismos 10: nosotros 4,751 limpias, ella 5,071, nosotros 5,383 si contamos los turnos marcados `ruido`. **Su número cae dentro de nuestro rango, casi al centro.** La diferencia no es de segmentación —las tandas son idénticas— sino de qué cuenta como pregunta: filtramos saludos, interjecciones del pleno e `INTERVENCIÓN:`. No hay nada que arreglar; sí hay que **declarar el criterio en el README**, porque cualquiera que cuente va a llegar a otro número por esta razón y no por un error. Ya se declaró.
+
+**Las dos discrepancias por medio son de canonización, en los dos lados.** Sus 41 tandas de `Heraldo Media Group` son la cadena literal; el corpus además trae `El Heraldo Media Group` (18) y `El Heraldo de México` (4), que nosotros sí juntamos: ahí nuestro número está mejor. Y su tabla reporta 32 tandas para Quatro Media pero 48 para Carlos Guzmán, cuyo medio más frecuente es ése: **su propia tabla es inconsistente consigo misma**, por las 11 grafías del medio. Conclusión práctica: la canonización de medios no se resuelve consultando a alguien que conoce la fuente, porque tropieza con lo mismo.
+
+### El segundo archivo trae además valoraciones: qué se puede y qué no
+
+Además de conteos, ese archivo contiene **valoraciones sobre personas identificadas por su nombre**. Qué son exactamente está escrito en el encabezado del propio archivo, en `assets/`, que es donde tiene que quedarse. **No se describen aquí**: este archivo sí se publica.
+
+**Reglas, no negociables:**
+
+1. **No sale del repo local.** Ni al README, ni a un artefacto, ni a un commit, ni a una figura, ni parafraseado. `assets/` está ignorado y ahí se queda. Los conteos de ese archivo sí se pueden usar para cotejar; las valoraciones no salen.
+2. **No es la muestra de oro y no la sustituye.** La muestra de oro se codifica pregunta por pregunta, a ciegas y **sin ver medio ni periodista** (regla metodológica 2). Esto es lo contrario: un juicio sobre la persona, hecho sabiendo quién es. Son instrumentos distintos midiendo unidades distintas.
+3. **No se usa para entrenar, ni para ajustar el prompt, ni para elegir umbrales.** Eso sería entrenar contra la validación (regla 4).
+4. **No se hereda hacia las preguntas.** Una valoración sobre una persona no se le aplica a cada una de sus preguntas; medir esa distribución **es** el objeto del proyecto, y etiquetar por herencia asumiría la conclusión.
+5. **No se reporta alfa de Krippendorff contra esto.** Su unidad es la persona; la nuestra, la pregunta.
+
+**Para qué sí sirve, y es valioso:** como **comparación externa registrada de antemano**. Se guardó el 2026-08-28, antes de que exista una sola clasificación de `postura`, para poder contrastarla al final sin haberla mirado en el camino. **Lo interesante será el desacuerdo**, no la coincidencia: los casos donde la medida pregunta por pregunta se aleje de la reputación son el hallazgo, igual que el conjunto de discrepancias de la fase 10.
+
+Y la advertencia de siempre: el proyecto **mide y describe, no adjetiva** (regla 8). Publicar una valoración de tercero sobre periodistas con nombre y apellido sería justo lo contrario.
 
 ### Codificación a ciegas: redacción aprobada e implementada
 
@@ -645,26 +733,31 @@ Los seis puntos de la parada de la fase 6 **no están aquí**: viven arriba, en 
 
 4. **Una atribución que sabemos mal y NO se parchó.** El turno `PREGUNTA: No lo interrumpas cuando…` quedó atribuido a Hans Salazar; es alguien del salón regañando a otro. La heurística de interjecciones no lo agarra porque es un solo turno con respuesta antes y después. Es el piso de error irreducible de la propagación hacia adelante sin juicio humano.
 5. **El hilo de Dalila Escobar del 2026-08-18 tiene 62 turnos y 31 preguntas**, muy por encima de los otros. Puede ser real —ella dice "el último, tercer tema"— o puede que otro periodista hablara sin presentarse y quedara absorbido. No se distingue sin leer.
-6. **Nos faltan 231 intervenciones (31%)** contra el conteo manual externo en enero–junio de 2026. Parte es recall de identificación, parte puede ser diferencia en la unidad de conteo. Es la meta medible de la fase 7.
+6. **Nos faltan 231 intervenciones (31%)** contra el conteo manual externo en enero–junio de 2026. Parte es recall de identificación, parte puede ser diferencia en la unidad de conteo. Es la meta medible de la fase 7. **Matizado el 2026-08-28:** el segundo contraste, sobre todo el periodo y agrupando por periodista, dio coincidencia **exacta en 10 de 10**. El hueco del 31% es entonces de los turnos **sin periodista identificado**, no de los que sí identificamos, y no afecta a los periodistas frecuentes.
+6b. **La canonización de nombres de medio no está hecha:** ~620 cadenas crudas. Carlos Guzmán dice su medio de 11 formas, alternando `Quatro` y `Cuatro`. Cualquier conteo por medio publicado hoy es un piso. El eje confiable es el periodista.
 7. **El `tema_dia` solo cubre el 49% y su calidad es despareja.** Bien: `salud`, `seguridad`. Mal: `casa llena`, `tres temas`. **No está listo para cruzarlo en el análisis final**; probablemente necesite el modelo sobre el fragmento de apertura.
 8. **Una docena de días hábiles sin conferencia que no son festivos obvios:** 2024-10-28, 2024-11-18, 2024-11-19, 2024-12-12, 2025-06-16, 2025-06-17, 2025-09-01 (día del Informe), 2025-11-10, 2025-12-05, 2025-12-12, 2026-04-17. Pueden ser giras o existir bajo otro slug.
 9. **Tres turnos `INTERVENCIÓN` quedan con `texto` vacío** porque todo su contenido era un aparte. Es correcto según el contrato, pero un texto vacío se confunde fácil con un error de parseo.
 10. **`CLAUDE.md` dice "del orden de 10 mil turnos de pregunta"** y el corpus tiene **27,278**. Corregir esa línea.
+11. **164 preguntas rechazadas por el clasificador temático** (1.3%), con su razón, en `data/checkpoints/temas_dos_niveles.rechazos.jsonl`. No cambian ninguna proporción, pero la regla dura 3 dice que nada se descarta en silencio: falta decidir si se reintentan.
+12. **Los 620 grupos de consolidación no se han revisado a mano.** Aplazado por el humano el 2026-08-28. El defecto de encadenamiento ya está corregido en el código y el invariante se verifica con `assert` en cada corrida, así que lo que falta es control de calidad, no reparación.
 
 ### Del entorno
 
-11. **gob.mx solo se deja leer con navegador VISIBLE.** Headless no pasa el reto anti-bot ni con espera de 50 s ni con parches anti-detección. La ventana se manda fuera de pantalla, pero **el pipeline no puede correr en un servidor sin escritorio.**
-12. **No se verificó que el otro proyecto que usa `votaciones_corte` siga funcionando** después de instalarle scikit-learn, sentence-transformers, torch y playwright. El dry-run no mostró downgrades y las versiones previas salieron idénticas, pero eso no es haberlo corrido.
-13. **`environment.yml` lista de más**, porque el ambiente es compartido. Reconstruirlo da algo que funciona pero más gordo que el mínimo, y con torch en versión CPU.
-14. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`.
-15. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un DataFrame y pasó, pero no se ha combinado con `sentence-transformers`.
-16. **La cobertura de fixtures sigue siendo de cinco conferencias.** Suficiente para haber encontrado once modos de falla, insuficiente para afirmar que el parser aguanta 460 sin sorpresas.
+13. **gob.mx solo se deja leer con navegador VISIBLE.** Headless no pasa el reto anti-bot ni con espera de 50 s ni con parches anti-detección. La ventana se manda fuera de pantalla, pero **el pipeline no puede correr en un servidor sin escritorio.**
+14. **No se verificó que el otro proyecto que usa `votaciones_corte` siga funcionando** después de instalarle scikit-learn, sentence-transformers, torch y playwright. El dry-run no mostró downgrades y las versiones previas salieron idénticas, pero eso no es haberlo corrido.
+15. **`environment.yml` lista de más**, porque el ambiente es compartido. Reconstruirlo da algo que funciona pero más gordo que el mínimo, y con torch en versión CPU.
+16. **`LogisticRegression(penalty=...)` está deprecado** en scikit-learn 1.9 y desaparece en 1.10. La fase 12 tiene que escribirse con `l1_ratio` y `C`.
+17. **pandas 3.0.1** es muy reciente. Se probó logística con validación cruzada sobre un DataFrame y pasó, pero no se ha combinado con `sentence-transformers`.
+18. **La cobertura de fixtures sigue siendo de cinco conferencias.** Suficiente para haber encontrado once modos de falla, insuficiente para afirmar que el parser aguanta 460 sin sorpresas.
 
 ### Resueltos en esta sesión, anotados para no repetirlos
 
 - **Costo de la fase 11: medido.** ~$18 USD con `gemini-2.5-flash` en batch, tres corridas sobre 22,282 preguntas. Más de la mitad del costo de entrada es el libro de códigos repetido en cada llamada; si algún día importa, ahí está el ahorro (context caching), no en bajar de modelo.
 - **La conferencia de Culiacán resultó ser un duplicado** del 2025-07-11 publicado bajo dos URLs, no una conferencia faltante.
 - **La hoja de ejemplo v1 se generó antes de implementar la redacción**, así que mostraba el medio y el humano codificó viéndolo. La v2 ya sale redactada; ninguna de esas preguntas entra a la muestra de oro.
+- **`consolidar()` fusionaba por cadenas.** Union-find metía en un grupo de 204 miembros cosas con Jaccard 0.00 entre sí. Corregido: cada miembro se compara contra el representante. 7 pruebas nuevas, 0 grupos encadenados, y 12 veces más rápido con un índice invertido.
+- **Un `<h2>` de más en el artefacto se llevó el CSS de otra sección.** Al reemplazar un bloque de estilos por posición, el corte se comió las reglas de la sección de dinero, que quedó sin estilo aunque su HTML seguía completo. Detectado contando selectores, no mirando la página.
 
 ## Cómo retomar
 

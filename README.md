@@ -18,18 +18,20 @@ flowchart LR
         B --> C["Parsear<br/>65,092 turnos"]
         C --> D["Armar hilos<br/>2,303 tandas"]
     end
-    subgraph curso ["En curso"]
-        E["Clasificar tema<br/>26% de 12,299"]
+    subgraph hecho2 ["Hecho"]
+        direction TB
+        E["Clasificar tema<br/>12,135 de 12,299"] --> E2["Consolidar asuntos<br/>9,795 → 8,862"]
     end
     subgraph falta ["Falta"]
         direction TB
-        F["Canonicalizar<br/>periodistas y medios"]
+        F["Canonicalizar<br/>medios"]
         G["Codificación humana<br/>150 preguntas"]
         H["Clasificar postura<br/>4 dimensiones"]
         I["Análisis"]
         F --> G --> H --> I
     end
-    D --> E --> F
+    D --> E
+    E2 --> F
 ```
 
 La codificación humana está antes de la clasificación de postura **a propósito, y el orden no se negocia**. Ver "Validación".
@@ -123,8 +125,14 @@ flowchart LR
     Q["Pregunta"] --> N1["<b>categoría</b><br/>1 de 18, lista cerrada<br/><i>para tabular</i>"]
     Q --> N2["<b>asunto</b><br/>el caso con nombres<br/><i>para seguir historias</i>"]
     N2 --> C["consolidar()<br/>fusiona casi-duplicados"]
-    C --> N3["asunto_canonico"]
+    C --> N3["asunto canónico<br/>8,862 en 620 grupos"]
 ```
+
+**La consolidación compara contra el representante del grupo, no contra cualquier miembro.** La primera versión usaba union-find, que fusiona en cadena: si A se parece a B y B a C, los tres quedan juntos aunque A y C no compartan una palabra. Sobre el corpus completo eso produjo un grupo de **204 variantes** que pegaba *regulación de redes sociales* con *reclutamiento del crimen organizado* a través de una frase puente, con similitud **0.00** entre los extremos. Un grupo así envenena cualquier conteo sin dar señal de que algo falló.
+
+Con la comparación contra el representante: **0 grupos encadenados**, el mayor tiene 14 variantes, y fusiona *más* grupos que antes (620 contra 502) porque el encadenamiento estaba absorbiendo casos distintos en pocos grupos gigantes. `scripts/consolidar_asuntos.py` verifica el invariante con un `assert` en cada corrida.
+
+**El mapa vive aparte, en `data/interim/mapa_consolidacion.json`.** El asunto crudo que produjo el modelo no se sobreescribe nunca, así que la consolidación se puede rehacer con otro umbral sin volver a pagar clasificación.
 
 Con solo etiqueta libre salen ~22 mil cadenas distintas y no se puede cruzar nada contra postura. Con solo 18 categorías se pierde que dentro de `seguridad_publica_y_justicia` conviven cinco historias sin relación entre sí.
 
@@ -171,6 +179,16 @@ flowchart TD
 
 **Segundo instrumento independiente:** embeddings **locales** más regresión logística. Locales a propósito: si los dos instrumentos salen del mismo proveedor, sus errores se correlacionan y las discrepancias dejan de ser informativas.
 
+### Contraste externo de la segmentación
+
+La calibración de arriba mide el clasificador. Antes que eso hay que saber si el **parser** corta donde debe, y eso se contrastó contra un conteo manual hecho por una persona que cubre la fuente.
+
+**Sobre los diez periodistas más frecuentes, el número de tandas coincidió exactamente: diez de diez, sin una sola diferencia.** Es la validación más fuerte que tiene el parser, porque confirma de un golpe tres cosas caras de verificar por separado: que los hilos se cortan donde deben, que la identidad del periodista se propaga bien dentro del hilo, y que dos grafías del mismo nombre no están partiendo a nadie en dos.
+
+El conteo de *preguntas* no coincidió, y la razón está acotada: no es segmentación —las tandas son idénticas— sino el criterio de qué cuenta como pregunta, descrito en "Limitaciones conocidas". El número externo cae dentro del rango que producen nuestros dos criterios.
+
+Ese material es de terceros y se usa **solo como validación posterior, nunca como insumo**. Si la canonicalización se construyera copiando la de otra persona, coincidir dejaría de ser evidencia de nada. Es la misma lógica que la codificación a ciegas y que los embeddings locales.
+
 ## Cómo se construyó
 
 ```bash
@@ -213,13 +231,21 @@ El valor de este repositorio está tanto en esta lista como en el código. Cada 
 
 **Falta ~25% de las intervenciones.** Contra un conteo manual externo del mismo periodo, el pipeline identifica 552 donde una persona contó 752. El faltante son periodistas que nunca dicen su nombre, y **no es aleatorio**.
 
+Un segundo contraste, sobre todo el periodo y agrupando por persona, acotó dónde está ese hueco: **para los diez periodistas más frecuentes la coincidencia fue exacta**. El faltante está entonces en los turnos que nunca llegan a tener periodista asignado, no repartido entre los que sí. Eso hace más confiables las cifras por periodista frecuente y no arregla nada del conteo total.
+
 **Las presentaciones tardías sesgan en una dirección.** Cuando alguien se presenta a media tanda (`"Por cierto, soy X, no me presenté"`), sus preguntas previas **se le acreditan al periodista anterior**. Son dos errores por caso, en sentidos opuestos, y hay 45 casos explícitos. Si alguien acostumbra presentarse tarde, el pipeline lo subcuenta sistemáticamente.
 
 **La canonicalización no está hecha.** 620 cadenas distintas de medio y 373 de periodista. `Grupo Imagen` y `Diario Imagen` pueden ser el mismo medio o no; esa decisión aún no se toma.
 
 **El `tema_dia` cubre el 49% y su calidad es despareja.** Bien: `salud`, `seguridad`. Mal: `casa llena`, `tres temas`.
 
-**El `asunto` no dura lo que prometía.** De 2,463 asuntos detectados, el **92% aparece en una sola conferencia**. Está capturando *el tema de esa tanda*, no una historia que vive semanas. Falta ver si la consolidación lo cambia.
+**El `asunto` no dura lo que prometía, y ya está medido sobre el corpus completo.** De los 8,862 asuntos canónicos, el **89% aparece en una sola conferencia**. En crudo eran 93%: consolidar mueve el número tres puntos, no lo cambia de naturaleza. El asunto captura *el tema de esa tanda*, no una historia que vive semanas, y ése era el argumento con el que se eligió consolidar sobre todo el corpus. Sirve para navegar y para ver de qué habla cada periodista; la duración de una historia hay que medirla de otra forma. Lo que sí queda son **796 asuntos que abarcan siete días o más**.
+
+**Los conteos por medio son un piso, los de periodista no.** La canonicalización de medios está pendiente y el problema es grande: un mismo reportero dice su medio de **once formas distintas**, alternando incluso la primera letra. Cualquier tabla por medio publicada hoy subcuenta. Por eso las cifras que este repositorio destaca están agrupadas por **periodista**, no por medio.
+
+**Qué cuenta como pregunta, declarado.** El pipeline filtra saludos (`PREGUNTA: Buenos días, Presidenta.`), interjecciones del pleno e `INTERVENCIÓN:`, que es ruido de sala. Ese criterio mueve el total sensiblemente: sobre los diez periodistas más frecuentes son 4,751 preguntas con el filtro y 5,383 sin él, un rango de ±6% alrededor del centro. **Cualquier conteo independiente va a dar un número distinto por esta razón y no por un error**, así que se declara aquí en vez de presentar una cifra como si fuera la única posible.
+
+**164 preguntas (1.3%) las rechazó el clasificador temático.** No se descartaron en silencio: están en `data/checkpoints/temas_dos_niveles.rechazos.jsonl` con su razón. No mueven ninguna proporción, pero falta decidir si se reintentan.
 
 ## Estructura
 
@@ -233,8 +259,8 @@ src/estenograficas/
   parseo.py              parseo masivo del corpus
   temas.py               etiqueta temática libre
   temas_dos_niveles.py   categoría cerrada + asunto, y consolidación
-scripts/                 correr y reconstruir la clasificación
-tests/                   129 pruebas
+scripts/                 correr, reconstruir y consolidar la clasificación
+tests/                   136 pruebas
 fixtures/                5 conferencias de muestra, versionadas
 data/                    en .gitignore
 ```
@@ -257,7 +283,7 @@ Medido contando tokens con la API, no estimado a ojo:
 
 | etapa | costo |
 |---|---|
-| clasificación temática, 12,299 preguntas | ~$5 USD |
+| clasificación temática, 12,135 preguntas (real) | ~$5 USD |
 | clasificación de postura, 3 corridas | ~$18 USD |
 
 Más de la mitad del costo de entrada es texto que se repite en cada llamada: el libro de códigos y el vocabulario de asuntos. Ahí está el ahorro si algún día importa, no en cambiar de modelo.

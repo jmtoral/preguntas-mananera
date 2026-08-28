@@ -181,42 +181,55 @@ def consolidar(
     con las mismas palabras clave (`Acuerdo comercial México-Unión Europea` /
     `Renovación acuerdo comercial con Unión Europea`), que es donde una medida
     de solapamiento basta y no cuesta nada.
+
+    **Cada miembro se compara contra el representante, no contra cualquier otro
+    miembro.** La versión anterior usaba union-find, que fusiona por cadenas: si
+    A se parece a B y B a C, los tres quedan juntos aunque A y C no compartan
+    una sola palabra. Medido sobre el corpus completo, eso produjo 6 grupos
+    encadenados de 502, pero uno tenía 204 miembros y pegaba
+    `Regulación redes sociales` con `Reclutamiento crimen organizado` a través
+    de la frase puente `Regulación redes sociales crimen organizado`, con
+    Jaccard 0.00 entre los extremos. Un grupo así envenena cualquier conteo por
+    asunto sin dar señal de que algo salió mal.
+
+    El costo de la corrección es que el resultado depende del orden en que se
+    eligen los representantes. Se recorre de más frecuente a menos frecuente y,
+    a frecuencia igual, alfabéticamente, para que dos corridas sobre el mismo
+    corpus den el mismo mapa.
     """
     from collections import Counter
 
     frec = Counter(a for a in asuntos if a)
-    nombres = list(frec)
-    padre = {n: n for n in nombres}
-
-    def raiz(x: str) -> str:
-        while padre[x] != x:
-            padre[x] = padre[padre[x]]
-            x = padre[x]
-        return x
-
+    # Orden determinista: primero el más frecuente; los empates, alfabéticos.
+    nombres = sorted(frec, key=lambda n: (-frec[n], n))
     bolsas = {n: _bolsa(n) for n in nombres}
-    for i, a in enumerate(nombres):
-        A = bolsas[a]
-        if not A:
-            continue
-        for b in nombres[i + 1 :]:
-            B = bolsas[b]
-            if not B:
-                continue
-            if len(A & B) / len(A | B) >= umbral_jaccard:
-                ra, rb = raiz(a), raiz(b)
-                if ra != rb:
-                    padre[rb] = ra
 
-    grupos: dict[str, list[str]] = {}
+    # Índice invertido palabra -> posiciones de representantes que la contienen.
+    # Jaccard >= umbral exige al menos una palabra en común, así que basta con
+    # mirar a los representantes que comparten alguna: sobre el corpus completo
+    # baja el trabajo de ~40 millones de comparaciones a unos cientos de miles.
+    # Se recorren los candidatos en orden de inserción para que el resultado sea
+    # el mismo que daría la comparación exhaustiva.
+    representantes: list[str] = []
+    indice: dict[str, list[int]] = {}
+    mapa: dict[str, str] = {}
     for n in nombres:
-        grupos.setdefault(raiz(n), []).append(n)
-
-    mapa = {}
-    for miembros in grupos.values():
-        rep = max(miembros, key=lambda m: (frec[m], -len(m)))
-        for m in miembros:
-            mapa[m] = rep
+        A = bolsas[n]
+        if not A:  # sin palabras significativas: nunca se fusiona
+            mapa[n] = n
+            continue
+        candidatos = sorted({i for w in A for i in indice.get(w, ())})
+        for i in candidatos:
+            B = bolsas[representantes[i]]
+            if len(A & B) / len(A | B) >= umbral_jaccard:
+                mapa[n] = representantes[i]
+                break
+        else:
+            pos = len(representantes)
+            representantes.append(n)
+            for w in A:
+                indice.setdefault(w, []).append(pos)
+            mapa[n] = n
     return mapa
 
 
