@@ -132,10 +132,42 @@ _PRENSA = {
     "PREGUNTA", "PREGUNTAS",
     "INTERLOCUTOR", "INTERLOCUTORA", "INTERLOCUTORES", "INTERLOCUTORAS",
 }
+
+# La etiqueta de prensa viene a veces con un paréntesis de modalidad:
+# `PREGUNTA (VIDEOLLAMADA)`, `PREGUNTA (ENLACE VIDEOLLAMADA)`. Sin esto la
+# etiqueta no casa con `_PRENSA`, cae al final de `clasificar_etiqueta()` y
+# queda como **funcionario**: 36 turnos de prensa contados como declaraciones
+# del gobierno. Es el mismo error que costó 421 turnos con `INTERLOCUTOR`.
+_PRENSA_CON_MODALIDAD = re.compile(
+    r"^(?:PREGUNTA|PREGUNTAS|INTERLOCUTOR[AES]{0,2})\s*\([^)]*\)$"
+)
+
 # `ASISTENTES` es el pleno coreando; no es un hablante.
 _RUIDO_DE_SALA = {
     "INTERVENCIÓN", "INTERVENCION", "INTERVENCIONES", "ASISTENTES",
 }
+
+# El mismo ruido de sala, con sexo o modalidad pegados: `INTERVENCIÓN HOMBRE`,
+# `INTERVENCIÓN MUJER (ENLACE VIDEOLLAMADA)`. Son la misma cosa que
+# `INTERVENCIÓN` a secas y tienen que recibir el mismo trato, o parten hilos en
+# dos sin dejar rastro.
+_RUIDO_CON_SUFIJO = re.compile(
+    r"^INTERVENCION(?:ES)?\b(?:\s+(?:HOMBRE|MUJER|HOMBRES|MUJERES))?"
+    r"(?:\s*\([^)]*\))?$"
+)
+
+# Siete grafías para la misma persona, incluidas tres erratas de la
+# transcripción: `RESIDENTA` sin la P, `PADO` por `PARDO`, y una
+# `CANDIDATA A LA PRESIDENCIA` que sobrevivió del periodo de transición.
+# Sin unificarlas, cualquier conteo de quién responde la parte en pedazos.
+_PRESIDENTA = re.compile(
+    r"^(?:(?:LA\s+)?(?:C\.\s*)?)?"
+    r"(?:P?RESIDENTA(?:\s+ELECTA)?(?:\s+DE\s+M[EÉ]XICO)?"
+    r"|CANDIDATA\s+A\s+LA\s+PRESIDENCIA(?:\s+DE\s+M[EÉ]XICO)?)?"
+    r",?\s*CLAUDIA\s+SHEINBAUM\s+PA[RD]{1,2}O$"
+)
+PRESIDENTA_CANONICA = "PRESIDENTA DE MÉXICO, CLAUDIA SHEINBAUM PARDO"
+"""Nombre único de la presidenta. Todo lo que case con `_PRESIDENTA` sale así."""
 
 # Palabras que denotan un cargo. Sirven para orientar la etiqueta: en 2026 el
 # formato es `CARGO, NOMBRE` pero en octubre de 2024 es `NOMBRE, CARGO`
@@ -178,8 +210,14 @@ def clasificar_etiqueta(etiqueta: str) -> tuple[Tipo, str | None, str | None]:
 
     if plano in {_sin_acentos_may(p) for p in _PRENSA}:
         return "prensa", None, None
+    if _PRENSA_CON_MODALIDAD.match(plano):
+        return "prensa", None, None
     if plano in {_sin_acentos_may(r) for r in _RUIDO_DE_SALA}:
         return "anonimo", None, None
+    if _RUIDO_CON_SUFIJO.match(plano):
+        return "anonimo", None, None
+    if _PRESIDENTA.match(plano):
+        return "funcionario", "PRESIDENTA DE MÉXICO", "CLAUDIA SHEINBAUM PARDO"
     if _VOCES_DE_VIDEO.match(plano):
         return "anonimo", None, None
 

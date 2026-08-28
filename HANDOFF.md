@@ -46,6 +46,30 @@ El 2026-08-28 la sesión se reinició y el Python de Windows **no murió con ell
 
 **4. La muestra de oro.** Sigue sin arrancar y sigue siendo el cuello de botella metodológico: nada de la fase 9 en adelante significa algo sin ella. Necesita el instructivo de codificación con ejemplos trabajados **tomados de fuera de las 150 muestreadas**.
 
+### El filtro de longitud que descartaba el 45% en silencio
+
+Encontrado el 2026-08-28 al planear la fase de postura. `scripts/clasificar_temas.py` traía en su selección de preguntas un `120 < len(texto) < 1500` que **nunca se documentó ni se discutió**.
+
+| | preguntas | |
+|---|---:|---|
+| ≤ 120 caracteres | 9,535 | **42%, excluidas** |
+| 120–1500 | 12,299 | 55%, clasificadas |
+| ≥ 1500 caracteres | 604 | **3%, excluidas** |
+
+**Viola la regla dura 3.** Esas 10,139 preguntas no fueron a un archivo de rechazos con su razón: se filtraron antes de que el checkpoint las viera. Desaparecieron sin dejar rastro, que es exactamente el modo de falla que la regla existe para prevenir.
+
+**Y el descarte no es inocuo, en ninguna de las dos direcciones.** Las cortas son las repreguntas:
+
+> *«¿Tienen algún número de fallecidos?»*
+> *«¿Hay algún avance sobre por qué se abrió fuego?»*
+> *«Entonces, ¿el tren de Nogales sí se va a construir en este sexenio?»*
+
+Ésas son **la cuarta dimensión del libro de códigos**, `insistencia`: "true si es repregunta tras una respuesta evasiva". Un filtro por longitud las borra casi por definición. Y las 604 largas son los turnos de tres preguntas de Manuel Pedrero y Hans Salazar, los que encabezan todos los conteos.
+
+Para temas probablemente no mueve mucho las proporciones. **Para postura era descalificante.**
+
+Corregido: entran todas las preguntas útiles; solo se excluyen las de menos de 12 caracteres, y ésas **sí se escriben a rechazos con su razón**. El criterio de saludos no cambia: eso lo marca el parser como `ruido` y ahí sigue.
+
 ### Cerrado el 2026-08-28: qué promete el nivel 2, medido sobre el corpus completo
 
 La pregunta quedó respondida y la respuesta es que **el nivel 2 no mide duración de una historia**.

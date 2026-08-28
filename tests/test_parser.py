@@ -363,3 +363,74 @@ def test_toda_pregunta_con_atribucion_declarada_queda_limpia(conf) -> None:
                 for medio in medios:
                     assert medio not in limpio, f"{medio} sigue visible"
                 assert h.periodista not in limpio
+
+
+# ---------------------------------------------------------------------------
+# Puntos 1, 2 y 3 del diagnóstico de la fase 6 (2026-08-28)
+# ---------------------------------------------------------------------------
+
+
+def test_pregunta_con_modalidad_es_prensa():
+    """36 turnos de prensa quedaban contados como declaraciones del gobierno.
+
+    `PREGUNTA (VIDEOLLAMADA)` no casaba con la lista de etiquetas de prensa,
+    caía al final de `clasificar_etiqueta()` y salía `funcionario`. Es el mismo
+    modo de falla que costó 421 turnos con `INTERLOCUTOR`.
+    """
+    for etiqueta in (
+        "PREGUNTA (VIDEOLLAMADA)",
+        "PREGUNTA(VIDEOLLAMADA)",
+        "PREGUNTA (ENLACE VIDEOLLAMADA)",
+        "INTERLOCUTORA (ENLACE VIDEOLLAMADA)",
+    ):
+        tipo, _, _ = clasificar_etiqueta(etiqueta)
+        assert tipo == "prensa", etiqueta
+
+
+def test_intervencion_con_sexo_es_ruido_de_sala():
+    """`INTERVENCIÓN HOMBRE` es lo mismo que `INTERVENCIÓN` y va igual.
+
+    Si se trata como hablante normal parte hilos en dos en silencio, que es el
+    error que no se detecta mirando el conteo de periodistas.
+    """
+    for etiqueta in (
+        "INTERVENCIÓN HOMBRE",
+        "INTERVENCIÓN MUJER",
+        "INTERVENCIÓN MUJER (ENLACE VIDEOLLAMADA)",
+        "INTERVENCIONES",
+    ):
+        tipo, _, _ = clasificar_etiqueta(etiqueta)
+        assert tipo == "anonimo", etiqueta
+
+
+def test_las_siete_grafias_de_la_presidenta_son_una_sola():
+    """Tres de las siete son erratas de la transcripción, no hablantes distintos."""
+    grafias = [
+        "PRESIDENTA DE MÉXICO, CLAUDIA SHEINBAUM PARDO",
+        "PRESIDENTA CLAUDIA SHEINBAUM PARDO",
+        "PRESIDENTA DE MÉXICO CLAUDIA SHEINBAUM PARDO",
+        "RESIDENTA DE MÉXICO, CLAUDIA SHEINBAUM PARDO",  # sin la P
+        "PRESIDENTA DE MÉXICO, CLAUDIA SHEINBAUM PADO",  # PADO
+        "CANDIDATA A LA PRESIDENCIA DE MÉXICO, CLAUDIA SHEINBAUM PARDO",
+        "CLAUDIA SHEINBAUM PARDO",
+    ]
+    salidas = {clasificar_etiqueta(g) for g in grafias}
+    assert len(salidas) == 1, salidas
+    tipo, cargo, hablante = salidas.pop()
+    assert (tipo, cargo, hablante) == (
+        "funcionario",
+        "PRESIDENTA DE MÉXICO",
+        "CLAUDIA SHEINBAUM PARDO",
+    )
+
+
+def test_otros_funcionarios_no_se_confunden_con_la_presidenta():
+    """La regla de la presidenta es específica; no puede tragarse a nadie más."""
+    tipo, cargo, hablante = clasificar_etiqueta(
+        "DIRECTOR GENERAL DEL IMSS, ZOÉ ROBLEDO ABURTO"
+    )
+    assert (tipo, cargo, hablante) == (
+        "funcionario",
+        "DIRECTOR GENERAL DEL IMSS",
+        "ZOÉ ROBLEDO ABURTO",
+    )
