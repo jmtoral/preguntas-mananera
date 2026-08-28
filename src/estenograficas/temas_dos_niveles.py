@@ -264,3 +264,97 @@ def textos_por_id(ruta_hilos: Path) -> dict[str, str]:
             if t["rol"] == "pregunta":
                 out[f'{h["conferencia_id"]}-h{h["hilo"]}-t{t["orden"]}'] = t["texto"]
     return out
+
+
+# ---------------------------------------------------------------------------
+# Versión concurrente
+# ---------------------------------------------------------------------------
+
+TRABAJADORES = 6
+"""Peticiones simultáneas.
+
+Medido: un lote de 10 tarda ~15 s y uno de 25 tarda ~33 s, o sea ~1.4 s por
+pregunta pase lo que pase con el tamaño del lote. El cuello no es la entrada
+sino la **salida**, que el modelo escribe token por token. Agrandar el lote no
+sirve; solapar peticiones sí. Con 6 en paralelo, 4.6 horas se vuelven ~45 min.
+
+El costo es el vocabulario: es estado compartido y secuencial. Cada trabajador
+ve una foto con unos segundos de retraso y va a inventar nombres nuevos para
+casos que otro acaba de nombrar. Se acepta a sabiendas: la reutilización ya
+rendía poco (30%) y `consolidar()` existe justo para fusionar casi-duplicados.
+"""
+
+
+def clasificar_paralelo(
+    preguntas: Iterable[tuple[str, str]],
+    claves: list[str],
+    cats_txt: str,
+    ck: Any,
+    vocab: list[str] | None = None,
+    lote: int = LOTE,
+    trabajadores: int = TRABAJADORES,
+) -> Iterator[Clasificacion]:
+    """Igual que `clasificar` pero con varias peticiones a la vez.
+
+    El vocabulario se comparte con un candado y se actualiza al cerrar cada
+    lote. El checkpoint se escribe desde el hilo que consume, no desde los
+    trabajadores, para que siga habiendo un solo escritor.
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from google import genai
+    from google.genai import types
+
+    from .config import gemini_api_key
+
+    cliente = genai.Client(api_key=gemini_api_key())
+    vocab = vocab if vocab is not None else []
+    candado = threading.Lock()
+    ya = ck.procesados()
+    pendientes = [(i, t) for i, t in preguntas if i not in ya]
+    trozos = [pendientes[k : k + lote] for k in range(0, len(pendientes), lote)]
+
+    def trabajo(trozo: list[tuple[str, str]]):
+        with candado:
+            vt = "\n".join(f"- {a}" for a in vocab[-VOCAB_EN_PROMPT:]) or "(todavía ninguno)"
+        payload = {i: t[:MAX_CARACTERES] for i, t in trozo}
+        error = ""
+        for intento in range(3):
+            try:
+                r = cliente.models.generate_content(
+                    model=MODELO,
+                    contents=json.dumps(payload, ensure_ascii=False),
+                    config=types.GenerateContentConfig(
+                        system_instruction=_INSTRUCCION.format(cats=cats_txt, vocab=vt),
+                        temperature=TEMPERATURA,
+                        response_mime_type="application/json",
+                    ),
+                )
+                return trozo, json.loads(r.text).get("clasificacion", {}), ""
+            except Exception as e:  # noqa: BLE001
+                error = f"{type(e).__name__}: {e}"
+                time.sleep(2**intento)
+        return trozo, {}, error
+
+    with ThreadPoolExecutor(max_workers=trabajadores) as pool:
+        futuros = [pool.submit(trabajo, t) for t in trozos]
+        for fut in as_completed(futuros):
+            trozo, datos, error = fut.result()
+            for pid, texto in trozo:
+                v = datos.get(pid) or {}
+                cat = v.get("categoria")
+                asu = " ".join((v.get("asunto") or "").split()) or None
+                if not cat or cat not in claves:
+                    ck.marcar_rechazado(
+                        pid, razon=error or f"categoría inválida o ausente: {cat!r}"
+                    )
+                    continue
+                if asu:
+                    with candado:
+                        if asu not in vocab:
+                            vocab.append(asu)
+                ck.marcar_hecho(pid, categoria=cat, asunto=asu)
+                yield Clasificacion(
+                    pid, cat, asu, None, "llm", MODELO, texto[:MAX_CARACTERES]
+                )

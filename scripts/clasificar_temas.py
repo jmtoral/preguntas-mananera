@@ -5,7 +5,7 @@ import json, sys, time
 from pathlib import Path
 from estenograficas.checkpoint import Checkpoint
 from estenograficas.config import paths
-from estenograficas.temas_dos_niveles import cargar_taxonomia, clasificar
+from estenograficas.temas_dos_niveles import cargar_taxonomia, clasificar_paralelo
 
 MESES = ("2024","2025","2026")   # corpus completo
 p = paths()
@@ -30,7 +30,7 @@ salida = p.interim / "temas_dos_niveles.jsonl"
 n = 0
 t0 = time.time()
 with open(salida, "a", encoding="utf-8") as f:
-    for c in clasificar(preg, claves, cats_txt, ck, vocab=vocab):
+    for c in clasificar_paralelo(preg, claves, cats_txt, ck, vocab=vocab):
         f.write(json.dumps(c.to_dict(), ensure_ascii=False) + "\n")
         n += 1
         if n % 50 == 0:

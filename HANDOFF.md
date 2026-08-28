@@ -114,7 +114,28 @@ Trampas ya identificadas: un periodista puede representar **dos medios a la vez*
 
 ## Hecho
 
-### Clasificación temática en dos niveles — EN MARCHA
+### Clasificación temática — DETENIDA por presupuesto el 2026-08-28
+
+**3,065 preguntas clasificadas de 12,299 (25%). 45 rechazadas. Todo guardado y reconstruido.**
+
+Se paró porque al humano se le acabó el presupuesto de API, no por un error.
+
+**Para retomar, dos comandos:**
+
+```bash
+python scripts/clasificar_temas.py     # retoma desde el checkpoint, no repaga nada
+python scripts/reconstruir_temas.py    # SIEMPRE al terminar
+```
+
+**Ya es concurrente.** Se midió que agrandar el lote no servía —10 preguntas tardan 15 s y 25 tardan 33 s, o sea ~1.4 s por pregunta pase lo que pase— porque el cuello es la **salida**, que el modelo escribe token por token. Solapar peticiones sí sirve: `clasificar_paralelo()` con 6 trabajadores pasó de **0.45 a 2.5 preguntas por segundo, 5.5 veces más rápido.** Lo que falta debería tomar ~1 hora, no 7.
+
+**El costo de paralelizar, asumido a sabiendas:** el vocabulario de asuntos es estado compartido y cada trabajador ve una foto con segundos de retraso, así que va a inventar nombres nuevos para casos que otro acaba de nombrar. Se aceptó porque la reutilización ya rendía poco (30%) y `consolidar()` existe para fusionar casi-duplicados.
+
+**Un susto que salió bien.** Al reiniciarse la sesión el Python de Windows no murió con ella, y por unos minutos hubo **dos procesos escribiendo al mismo checkpoint**. Resultado: 0 líneas truncadas y 0 ids duplicados. El registro append-only con `fsync` por renglón aguantó escritores concurrentes. (Nota operativa: `taskkill` quiere el WINPID, cuarto campo de `ps -W`, no el PID de bash.)
+
+**Pendiente inmediato al retomar:** terminar la corrida, correr `consolidar()` sobre todo el corpus y **mostrarle al humano los grupos grandes para que los apruebe**.
+
+### Clasificación temática en dos niveles — el diseño
 
 Trabajo del 2026-08-27. **Hay una corrida larga en curso**; si esta sesión murió, retomarla es un comando.
 
