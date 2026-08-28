@@ -17,6 +17,7 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 **Bloqueado esperando dos cosas del humano:**
 
 1. Decidir sobre los 6 puntos de la parada de la fase 6 (abajo).
+1bis. Decidir qué hacer con las **presentaciones tardías y la cesión de la palabra** —sesgo direccional en la medida principal—, con cinco opciones planteadas justo antes de esos 6 puntos.
 2. **Respaldar `data/raw/` fuera del repo.** 460 archivos, 75 MB, no están en git y reconstruirlos depende de que gob.mx siga sirviendo.
 
 ---
@@ -42,6 +43,42 @@ Lo que hay en disco (todo en `.gitignore`):
 | `data/interim/conferencias.jsonl` | 460, con `tema_dia` |
 | `data/gold/EJEMPLO_*.xlsx` | 2 hojas de ejemplo, **ya codificadas por el humano** |
 | `assets/` | **material de terceros. NO se publica, NO se comparte, NO se nombra su autoría en archivos versionados.** |
+
+### PENDIENTE DE DECIDIR: presentaciones tardías y cesión de la palabra
+
+Lo encontró el humano el 2026-08-27 leyendo la conferencia del 2026-01-22. **No se tocó nada; espera su decisión.**
+
+**El caso.** En el turno #70 alguien dice *«Muchas gracias. Por cierto, soy Gregorio Varela, de Cinco Radio. No me presenté.»* El parser abre su hilo ahí. Pero él ya venía preguntando desde el **#66**, y esos turnos quedaron acreditados a Oscar Zamudio, el periodista anterior.
+
+**Por qué importa más de lo que parece.** Cuando alguien se presenta tarde, sus preguntas no se pierden: **se le acreditan a otro**. Son dos errores por caso, en direcciones opuestas. Hay **45 casos explícitos** en el corpus (`no me presenté`, `por cierto, soy…`), y Carlos Pozos aparece varias veces en esa lista. **Si un periodista tiene la costumbre de presentarse tarde, el pipeline lo subcuenta sistemáticamente y sobrecuenta a quien le tocó antes. Eso no es ruido, es sesgo direccional en la medida principal del proyecto.**
+
+**La señal que lo resolvería ya está capturada y sin usar.** Un turno antes, en el #65, la presidenta dice *«Vamos de este lado. A ver, el compañero»*. Eso es la cesión de la palabra, y vive en el campo `apartes`. Medido sobre el corpus:
+
+| | |
+|---|---|
+| apartes que ceden la palabra | 2,262 (33% de todos) |
+| conferencias con al menos uno | 433 de 460 |
+| cesiones a 1–3 turnos del inicio de un hilo | 902 |
+| hilos actuales | 2,303 |
+
+Y **es exactamente el dato que la regla metodológica 7 exige reportar** —a quién le dan la palabra no es aleatorio, la presidenta elige a dedo y lo dice en voz alta—. Está capturado y no se usa para nada.
+
+**Las cinco opciones, tal como se le presentaron al humano:**
+
+- **A. Retroceder desde la presentación tardía** hasta una frontera hacia atrás. Arregla los 45 con precisión; riesgo de robarle turnos al periodista anterior si la frontera falla.
+- **B. Cambiar el modelo: el hilo lo define la cesión de la palabra, no la presentación.** Estructuralmente correcto —una tanda empieza cuando alguien recibe el micrófono, no cuando dice su nombre— y arreglaría también el 25% de intervenciones que hoy faltan porque nadie se presenta. Es el cambio grande.
+- **C. Marcar la zona ambigua como `incierta`.** Honesto y barato, pero tira dato que sí se conoce.
+- **D. Dejárselo al modelo en la fase 7**, mandándole la zona de frontera.
+- **E. Señal de saludo completo.** Un turno de prensa que abre con saludo entero (*«Muy buenos días, Presidenta. Muy buenos días a todos.»*) a media tanda es alguien nuevo. Barata y complementaria.
+
+**Recomendación del agente: B por etapas, no de frente.**
+
+1. Extraer la cesión de palabra a su propio campo. Cero riesgo y es dato que el análisis necesita igual.
+2. Medir qué tan bien predice las fronteras contra los hilos actuales.
+3. Con ese número decidir si se vuelve la frontera o solo complementa.
+
+**Trampa conocida de esa señal:** entre las cesiones más frecuentes están `Adelante, Iván`, `Adelante, Marcela`, `Adelante, Marcelo`, `Adelante, Ariadna`. **No son a periodistas: son a funcionarios**, a quienes la presidenta cede la palabra por su nombre de pila. Hay que separarlas o se meterían fronteras falsas.
+
 
 ### Los 6 puntos que esperan decisión
 
