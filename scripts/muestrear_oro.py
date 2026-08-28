@@ -160,22 +160,59 @@ def main() -> int:
         if not linea.strip():
             continue
         h = json.loads(linea)
-        previos: list[str] = []
-        for t in h["turnos"]:
-            if t["rol"] == "pregunta" and not t["ruido"]:
-                pid = f'{h["conferencia_id"]}-h{h["hilo"]}-t{t["orden"]}'
-                if pid not in YA_VISTAS and len(t["texto"].strip()) >= 12:
-                    universo.append({
-                        "id": pid,
-                        "fecha": h["conferencia_id"],
-                        "periodista": h["periodista"],
-                        "medio": h["medio"],
-                        "texto": t["texto"],
-                        "contexto": previos[-2:],
-                        "abre_hilo": t["atribucion"] == "declarada",
-                    })
-            previos.append(f'{"PRENSA" if t["rol"] == "pregunta" else "RESPUESTA"}: '
-                           f'{" ".join(t["texto"].split())}')
+        turnos = h["turnos"]
+        etiqueta = lambda t: ("PRENSA: " if t["rol"] == "pregunta" else "PRESIDENTA: ")
+        for i, t in enumerate(turnos):
+            if t["rol"] != "pregunta" or t["ruido"]:
+                continue
+            pid = f'{h["conferencia_id"]}-h{h["hilo"]}-t{t["orden"]}'
+            if pid in YA_VISTAS or len(t["texto"].strip()) < 12:
+                continue
+            # Contexto previo: hasta 4 turnos, y se corta al llegar a ~900
+            # caracteres. Dos turnos fijos no alcanzaban: cuando la pregunta
+            # viene interrumpida en la estenográfica —pasa, y la marca es que
+            # termina en puntos suspensivos— el turno anterior puede ser de
+            # otro tema por completo y el fragmento queda ilegible.
+            previos, largo = [], 0
+            for u in reversed(turnos[max(0, i - 4):i]):
+                s = etiqueta(u) + " ".join(u["texto"].split())
+                if not s.strip() or s.strip().endswith(":"):
+                    continue
+                if previos and largo + len(s) > 900:
+                    break
+                previos.append(s)
+                largo += len(s)
+            previos.reverse()
+            # Lo que siguió. Va rotulado aparte para que se lea como contexto y
+            # no como parte de la pregunta.
+            #
+            # Cuando la pregunta viene **interrumpida** en la estenográfica, un
+            # solo turno no basta: el sentido suele aparecer dos o tres turnos
+            # después, cuando el periodista termina la idea. Medido: 16 de las
+            # 150 quedan cortadas. Para ésas se muestra el intercambio completo,
+            # hasta 4 turnos.
+            truncada = t["texto"].rstrip().endswith(("…", "...", "—", "–"))
+            sig, largo_sig = [], 0
+            for u in turnos[i + 1:i + (5 if truncada else 3)]:
+                s = " ".join(u["texto"].split())
+                if not s:
+                    continue
+                sig.append(etiqueta(u) + s)
+                largo_sig += len(s)
+                if not truncada or largo_sig > 600:
+                    break
+            sigue = "\n".join(sig)
+            universo.append({
+                "id": pid,
+                "fecha": h["conferencia_id"],
+                "periodista": h["periodista"],
+                "medio": h["medio"],
+                "texto": t["texto"],
+                "contexto": previos,
+                "sigue": sigue,
+                "truncada": truncada,
+                "abre_hilo": t["atribucion"] == "declarada",
+            })
 
     print(f"marco muestral: {len(universo):,} preguntas "
           f"({len(YA_VISTAS)} excluidas por ya vistas)")
@@ -190,15 +227,16 @@ def main() -> int:
             break
         texto, _ = redactar_identificacion(r["texto"])
         texto = tapa_nombres(texto, r["periodista"], r["medio"])
-        ctx = " ⏎ ".join(
-            tapa_nombres(redactar_identificacion(c)[0], r["periodista"], r["medio"])
-            for c in r["contexto"]
-        )
-        fuga = hay_fuga(texto + " " + ctx, r["periodista"], r["medio"])
+        tapa = lambda s: tapa_nombres(redactar_identificacion(s)[0],
+                                      r["periodista"], r["medio"])
+        ctx = "\n".join(tapa(c) for c in r["contexto"])
+        sigue = tapa(r["sigue"]) if r["sigue"] else ""
+        fuga = hay_fuga(" ".join((texto, ctx, sigue)), r["periodista"], r["medio"])
         if fuga:
             descartadas.append((r["id"], fuga))
             continue
-        elegidas.append({**r, "visible": " ".join(texto.split()), "ctx": ctx})
+        elegidas.append({**r, "visible": " ".join(texto.split()), "ctx": ctx,
+                         "sig": sigue})
 
     if len(elegidas) < args.n:
         print(f"ATENCIÓN: solo se juntaron {len(elegidas)} de {args.n}", file=sys.stderr)
@@ -212,10 +250,11 @@ def main() -> int:
     with llave.open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["codigo", "lote", "id_pregunta", "fecha", "periodista", "medio",
-                    "abre_hilo"])
+                    "abre_hilo", "truncada"])
         for i, r in enumerate(elegidas, 1):
             w.writerow([f"P-{i:03d}", lote[i - 1], r["id"], r["fecha"],
-                        r["periodista"] or "", r["medio"] or "", r["abre_hilo"]])
+                        r["periodista"] or "", r["medio"] or "", r["abre_hilo"],
+                        r["truncada"]])
 
     try:
         from openpyxl import Workbook
@@ -224,30 +263,68 @@ def main() -> int:
         print("openpyxl no está; solo se escribió la llave", file=sys.stderr)
         return 1
 
+    # Si ya existe una hoja con respuestas, se arrastran por código. Los códigos
+    # son estables mientras no cambie la semilla, así que regenerar la hoja por
+    # un arreglo de formato no puede costarle al humano el trabajo ya hecho.
+    previas: dict[str, list] = {}
+    anterior = p.gold / "muestra_oro_hoja.xlsx"
+    if anterior.exists():
+        try:
+            from openpyxl import load_workbook
+            wba = load_workbook(anterior, data_only=True)
+            for ws in wba.worksheets:
+                cab = [c.value for c in ws[1]]
+                for fila in ws.iter_rows(min_row=2, values_only=True):
+                    d = dict(zip(cab, fila))
+                    vals = [d.get("postura"),
+                            d.get("fragmento que te hizo decidir"),
+                            d.get("notas / dudas")]
+                    if d.get("codigo") and any(v for v in vals):
+                        previas[d["codigo"]] = vals
+            if previas:
+                print(f"se arrastran {len(previas)} respuestas ya codificadas")
+        except Exception as exc:  # openpyxl no pudo abrirla; no es fatal
+            print(f"no se pudo leer la hoja anterior ({exc})", file=sys.stderr)
+
     wb = Workbook()
     for numero in (1, 2):
         ws = wb.active if numero == 1 else wb.create_sheet()
         ws.title = f"lote {numero}"
-        ws.append(["codigo", "contexto (2 turnos previos)", "PREGUNTA A CODIFICAR",
-                   "postura", "fragmento que te hizo decidir", "notas / dudas"])
+        ws.append(["codigo", "lo que se dijo antes", "PREGUNTA A CODIFICAR",
+                   "lo que siguió", "postura", "fragmento que te hizo decidir",
+                   "notas / dudas"])
         filas = [(i, r) for i, r in enumerate(elegidas) if lote[i] == numero]
         for i, r in filas:
-            ws.append([f"P-{i + 1:03d}", r["ctx"], r["visible"], "", "", ""])
+            visible = r["visible"] + ("   ⟨la pregunta queda cortada aquí en la "
+                                      "versión estenográfica⟩" if r["truncada"] else "")
+            cod = f"P-{i + 1:03d}"
+            ws.append([cod, r["ctx"], visible, r["sig"], *previas.get(cod, ["", "", ""])])
         dv = DataValidation(
             type="list", formula1='"' + ",".join(OPCIONES["postura"]) + '"',
             allow_blank=True, showDropDown=False,
         )
         ws.add_data_validation(dv)
-        dv.add(f"D2:D{len(filas) + 1}")
-        for col, ancho in zip("ABCDEF", (9, 56, 76, 21, 40, 34)):
+        dv.add(f"E2:E{len(filas) + 1}")
+        for col, ancho in zip("ABCDEFG", (9, 50, 68, 44, 21, 36, 30)):
             ws.column_dimensions[col].width = ancho
-        ws.freeze_panes = "D2"
+        ws.freeze_panes = "E2"
         for fila in ws.iter_rows(min_row=1, max_row=len(filas) + 1):
             for celda in fila:
                 celda.alignment = celda.alignment.copy(wrap_text=True, vertical="top")
 
     hoja = p.gold / "muestra_oro_hoja.xlsx"
-    wb.save(hoja)
+    try:
+        wb.save(hoja)
+    except PermissionError:
+        # Suele significar que está abierta en Excel. No se pisa y no se pierde
+        # nada: se escribe al lado con sufijo y el humano decide.
+        n = 2
+        while (p.gold / f"muestra_oro_hoja_v{n}.xlsx").exists():
+            n += 1
+        hoja = p.gold / f"muestra_oro_hoja_v{n}.xlsx"
+        wb.save(hoja)
+        print(f"la hoja anterior estaba abierta; se escribió {hoja.name}",
+              file=sys.stderr)
 
     n1 = sum(1 for v in lote.values() if v == 1)
     print(f"\nhoja  : {hoja}   (lote 1: {n1} · lote 2: {len(elegidas) - n1})")

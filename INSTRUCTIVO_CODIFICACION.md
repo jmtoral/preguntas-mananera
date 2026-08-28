@@ -100,6 +100,24 @@ Cuando la pregunta habla de un tercero **pero le reclama al gobierno**, es `crí
 
 ---
 
+## Las columnas de contexto, y las preguntas cortadas
+
+La hoja trae **dos** columnas de contexto, una de cada lado:
+
+- **`lo que se dijo antes`** — hasta cuatro turnos previos.
+- **`lo que siguió`** — lo que vino después.
+
+Las dos son contexto, no el objeto: **se codifica la pregunta, no la respuesta.** Existe la de la derecha porque hay preguntas que la estenográfica corta a media frase —la presidenta interrumpe— y sin ver cómo siguió el intercambio, el fragmento es ilegible. **Son 16 de las 150**, y llevan la marca `⟨la pregunta queda cortada aquí en la versión estenográfica⟩`.
+
+Ejemplo real de la muestra:
+
+> **pregunta** — *«El cambio de nombre de "Solidaridad" por "Playa del Carmen", que representa lo más oscuro de ese…»*
+> **lo que siguió** — PRESIDENTA: *Hay que preguntarle a la ciudadanía.* / PRENSA: *Ya se realizó.* / PRESIDENTA: *Ah, ¿sí?* / PRENSA: *Sí. Fue un éxito. La gente no quería saber nada de lo que era el gobierno de Carlos Salinas de Gortari…*
+
+Sola es incodificable. Con lo que siguió se ve que el objeto es Salinas, y entonces sí se puede decidir.
+
+**Si aun con las dos columnas no se entiende, `no clasificable` y una nota.** No adivines: el corte está en la fuente, no es culpa tuya, y una decisión inventada contamina la calibración más que un hueco declarado.
+
 ## Cuando dudes
 
 - **Si caben dos, elige la que carga más peso y escribe la duda.** La columna `notas / dudas` vale tanto como la otra: el lote de 30 existe para encontrar dónde las definiciones fallan, y eso solo se ve en tus dudas.
