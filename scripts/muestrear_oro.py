@@ -54,14 +54,30 @@ YA_VISTAS = {
     "2025-10-24-h0-t54", "2024-10-31-h2-t41",
 }
 
+# Una sola dimensión, cuatro valores. Decidido el 2026-08-28.
+#
+# El libro de códigos original tenía cuatro dimensiones (objetivo, postura,
+# funcion, insistencia). Se colapsan a una porque el objetivo del trabajo dejó
+# de ser un artículo académico: la pregunta es de qué signo son las preguntas,
+# y `funcion` e `insistencia` no la contestan. Codificar una columna en vez de
+# cuatro baja el trabajo humano de 600 decisiones a 150.
+#
+# Lo que NO se hizo, y es la parte que importa: colapsar a las tres categorías
+# de uso periodístico —crítica / afín / de interés público—. «De interés
+# público» no está en el mismo eje que las otras dos: mide el mérito de la
+# pregunta, no su dirección, y casi todo el buen periodismo es crítico y de
+# interés público a la vez. Obligar a escoger hace que quien codifica resuelva
+# ese conflicto en su cabeza, distinto cada vez, y eso hunde el alfa. Además
+# la etiqueta afirma que las otras dos no son de interés público, que es
+# justo el tipo de juicio que la regla 8 prohíbe.
+#
+# `critica_a_un_tercero` existe porque el 15% de las preguntas habla de la
+# oposición o de un actor externo. Una pregunta durísima contra García Luna o
+# contra Trump no es crítica al gobierno ni lo halaga, y sin esta categoría
+# caería en el cajón neutral junto con las peticiones de dato.
 OPCIONES = {
-    "objetivo": ["gobierno", "oposicion", "actor_externo", "medios", "ninguno",
-                 "no_clasificable"],
-    "postura": ["confrontativa", "neutral", "favorable", "no_clasificable"],
-    "funcion": ["pide_informacion", "cuestiona_afirmacion",
-                "invita_comentario_sobre_tercero", "plantea_demanda",
-                "no_clasificable"],
-    "insistencia": ["si", "no", "no_clasificable"],
+    "postura": ["crítica al gobierno", "afín al gobierno", "crítica a un tercero",
+                "neutral", "no clasificable"],
 }
 
 
@@ -213,19 +229,17 @@ def main() -> int:
         ws = wb.active if numero == 1 else wb.create_sheet()
         ws.title = f"lote {numero}"
         ws.append(["codigo", "contexto (2 turnos previos)", "PREGUNTA A CODIFICAR",
-                   "objetivo", "postura", "funcion", "insistencia",
-                   "fragmento que te hizo decidir la postura", "notas / dudas"])
+                   "postura", "fragmento que te hizo decidir", "notas / dudas"])
         filas = [(i, r) for i, r in enumerate(elegidas) if lote[i] == numero]
         for i, r in filas:
-            ws.append([f"P-{i + 1:03d}", r["ctx"], r["visible"], "", "", "", "", "", ""])
-        for col, campo in zip("DEFG", OPCIONES):
-            dv = DataValidation(
-                type="list", formula1='"' + ",".join(OPCIONES[campo]) + '"',
-                allow_blank=True, showDropDown=False,
-            )
-            ws.add_data_validation(dv)
-            dv.add(f"{col}2:{col}{len(filas) + 1}")
-        for col, ancho in zip("ABCDEFGHI", (9, 58, 78, 17, 15, 30, 13, 42, 30)):
+            ws.append([f"P-{i + 1:03d}", r["ctx"], r["visible"], "", "", ""])
+        dv = DataValidation(
+            type="list", formula1='"' + ",".join(OPCIONES["postura"]) + '"',
+            allow_blank=True, showDropDown=False,
+        )
+        ws.add_data_validation(dv)
+        dv.add(f"D2:D{len(filas) + 1}")
+        for col, ancho in zip("ABCDEF", (9, 56, 76, 21, 40, 34)):
             ws.column_dimensions[col].width = ancho
         ws.freeze_panes = "D2"
         for fila in ws.iter_rows(min_row=1, max_row=len(filas) + 1):

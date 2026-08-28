@@ -109,6 +109,38 @@ Siete pruebas nuevas en `tests/test_temas.py`, incluida `test_no_encadena_por_un
 
 ## Hecho
 
+### El libro de códigos pasó de cuatro dimensiones a una (2026-08-28)
+
+Decisión del humano, con el motivo explícito: **no va a escribir un artículo académico**, así que cuatro dimensiones ortogonales son un impuesto que no compra nada. `funcion` e `insistencia` no contestan la pregunta que le interesa.
+
+Su propuesta inicial fueron las tres categorías de uso periodístico —crítica / afín / **de interés público**—, que son las mismas que usa la fuente externa. Se contrapropuso y aceptó una variante, por dos razones que conviene no volver a discutir desde cero:
+
+1. **«De interés público» no está en el mismo eje que las otras dos.** Mide el mérito de la pregunta, no su dirección. Casi todo el buen periodismo es crítico y de interés público a la vez, así que al obligar a escoger, quien codifica resuelve ese conflicto en su cabeza, sin dejar rastro y distinto cada vez. Eso hunde la confiabilidad, y no por tener pocas categorías sino por no ser excluyentes.
+2. **La etiqueta juzga.** Decir que una categoría es «de interés público» afirma que las otras no lo son. Regla 8.
+
+Además tenía un hueco medible: **3,420 preguntas, el 15%, hablan de la oposición o de un actor externo**. Una pregunta durísima contra García Luna o contra Trump no es crítica al gobierno ni lo halaga; se habría ido al cajón de en medio revuelta con las peticiones de dato.
+
+**El esquema que quedó:** una columna, cuatro valores — `crítica al gobierno`, `afín al gobierno`, `crítica a un tercero`, `neutral`, más `no clasificable`.
+
+**La regla operativa, que es lo que hace codificable el esquema: la carga está en la premisa, no en el tema.** «¿Hay algún dato de avance?» es neutral; «hay avances importantes, ¿cuál es su mensaje?» es afín. Mismo tema, signo distinto, y la diferencia está entera en lo que la pregunta da por sentado. Y cuando habla de un tercero pero le reclama al gobierno, es crítica al gobierno: la prueba es **quién queda mal si la pregunta tiene razón**.
+
+`objetivo`, `funcion` e `insistencia` **se dejan de codificar, no se borran**. La muestra es la misma; si algún día hace falta el artículo, se codifican entonces sobre estas mismas 150.
+
+### La muestra de oro y su instructivo, listos
+
+`scripts/muestrear_oro.py` produce hoja y llave por separado, con semilla fija (`20260828`), así que la muestra es reproducible y **no cambió** al rehacer las columnas.
+
+- **Hoja:** `data/gold/muestra_oro_hoja.xlsx`, dos pestañas de 30 y 120, menú desplegable en la única columna a codificar.
+- **Llave:** `data/gold/muestra_oro_LLAVE_no_abrir.csv`. Periodista, medio e `id_pregunta` viven aquí. La hoja **no lleva el id** porque trae la fecha y el número de hilo y con eso se puede buscar de quién es.
+
+**La ceguera se verifica, no se promete.** Se midió primero la fuga por contexto: **108 respuestas de la presidenta nombran al periodista de esa tanda** («Gracias, Hans»). El script tapa nombre, apellidos y vocativos, y después revisa fila por fila que ningún término de la llave sobreviva. Sobre la hoja generada: **0 fugas**.
+
+Un error propio, corregido: la primera versión del detector descartaba por palabras genéricas del nombre del medio —`México`, `Grupo`, `programa`—, lo que habría excluido toda pregunta de tema nacional. Sesgo grande y en una sola dirección. Con la lista de genéricas los descartes bajaron de 12 a 5, todos legítimos.
+
+**Composición de las 150:** 10 de 2024, 89 de 2025, 51 de 2026 —proporcional al corpus—; 13 abren tanda y 137 son seguimiento; mediana de 177 caracteres.
+
+**`INSTRUCTIVO_CODIFICACION.md`**, con 10 ejemplos trabajados verificados por cotejo como fuera de las 150. Deja escrito que los ejemplos son lectura del agente y que eso infla el acuerdo, para que se reporte junto al número. El humano eligió esa opción a sabiendas, sobre la alternativa de codificar 10 en frío primero.
+
 ### Conteo de palabras: hallazgo con su confusor medido (2026-08-28)
 
 Se puede contar cuánto habla cada quien sin clasificar nada. Sobre el corpus completo:

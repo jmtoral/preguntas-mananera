@@ -101,16 +101,24 @@ Estas ya costaron trabajo descubrirlas. No las vuelvas a descubrir.
 
 ## Libro de códigos
 
-Cada pregunta se clasifica en cuatro dimensiones. **No colapsar en un solo eje.** Una pregunta puede ser durísima contra la oposición, lo cual favorece al gobierno sin ser un halago.
+**Cambiado el 2026-08-28 por decisión del humano.** El objetivo del trabajo dejó de ser un artículo académico, así que se codifica **una sola dimensión con cuatro valores** en vez de cuatro dimensiones. Baja el trabajo humano de 600 decisiones a 150 y contesta la pregunta que sí interesa.
 
 | Campo | Valores |
 |---|---|
-| `objetivo` | gobierno, oposicion, actor_externo, medios, ninguno |
-| `postura` | confrontativa, neutral, favorable |
-| `funcion` | pide_informacion, cuestiona_afirmacion, invita_comentario_sobre_tercero, plantea_demanda |
-| `insistencia` | true si es repregunta tras una respuesta evasiva |
+| `postura` | crítica al gobierno, afín al gobierno, **crítica a un tercero**, neutral |
 
-Todo valor admite `no_clasificable`. Toda clasificación incluye el fragmento textual que la justifica.
+Admite `no clasificable`. Toda clasificación incluye el fragmento textual que la justifica.
+
+**`crítica a un tercero` no es un adorno: es la categoría que sostiene la regla vieja de no colapsar el eje.** Una pregunta durísima contra la oposición favorece al gobierno sin ser un halago, y sin este valor caería en `neutral` junto con las peticiones de dato. Medido sobre el corpus: **el 15% de las preguntas habla de la oposición o de un actor externo.**
+
+**Por qué NO se usan las tres categorías de uso periodístico** (crítica / afín / de interés público), que fue la propuesta inicial:
+
+1. **«De interés público» no está en el mismo eje.** Mide el mérito de la pregunta, no su dirección. Casi todo el buen periodismo es crítico *y* de interés público a la vez; obligar a escoger hace que quien codifica resuelva ese conflicto en su cabeza, distinto cada vez, y eso destruye la confiabilidad.
+2. **La etiqueta juzga.** Nombrar así a una categoría afirma que las otras dos no son de interés público. La regla 8 pide categorías que alguien con la posición política contraria aplicaría igual, y ésta no lo es.
+
+**Regla operativa que resuelve casi todos los casos: la carga está en la premisa, no en el tema.** Dos preguntas sobre lo mismo cambian de signo según lo que den por sentado. Y cuando una pregunta habla de un tercero pero le reclama al gobierno, es `crítica al gobierno`: la prueba es quién queda mal si la pregunta tiene razón.
+
+**`objetivo`, `funcion` e `insistencia` se dejan de codificar, no se borran.** Los datos siguen ahí y la muestra es la misma; si algún día hace falta el artículo, se codifican entonces sobre estas mismas 150. El instructivo completo está en `INSTRUCTIVO_CODIFICACION.md`.
 
 ## Reglas metodológicas
 
