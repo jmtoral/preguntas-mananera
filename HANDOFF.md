@@ -8,107 +8,59 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ## Estado
 
-**Fase actual:** 6 (parseo masivo) **CORRIDA y en PARADA OBLIGATORIA.** El corpus está descargado, parseado y publicado. **Nada avanza hasta que el humano decida sobre los hallazgos del diagnóstico**, listados abajo en "Lo primero al retomar".
+**Última actualización:** 2026-08-28. Sesión cerrada por presupuesto de API, no por error.
 
-**Última actualización:** 2026-08-27.
-**Ambiente conda:** **`votaciones_corte`**, Python 3.11.14. Conda no está en el PATH; usar el intérprete por ruta absoluta: `C:/Users/User/anaconda3/envs/votaciones_corte/python.exe`. En Windows, anteponer `PYTHONIOENCODING=utf-8` o la consola destroza los acentos al imprimir (no los archivos, solo la impresión).
-**Repositorio:** https://github.com/jmtoral/preguntas-mananera — **público**, al día con `origin/main`.
+**Ambiente:** `votaciones_corte`, Python 3.11. Conda no está en el PATH; usar el intérprete por ruta:
+`C:/Users/User/anaconda3/envs/votaciones_corte/python.exe`. En Windows anteponer `PYTHONIOENCODING=utf-8` o la consola destroza los acentos al imprimir (los archivos están bien, es solo la impresión).
 
-**Además: hay una corrida de clasificación temática EN MARCHA** (`scripts/clasificar_temas.py`). Es reanudable y el checkpoint es durable; si murió, relanzarla y después correr `scripts/reconstruir_temas.py`. Detalle completo en "Clasificación temática en dos niveles".
+**Repositorio:** https://github.com/jmtoral/preguntas-mananera — público, al día con `origin/main`.
 
-**Bloqueado esperando dos cosas del humano:**
+**Node** está instalado en `C:\Program Files\nodejs\node.exe` pero **fuera del PATH de bash**; llamarlo por ruta. Sirve para el validador de paletas de la skill `dataviz`.
 
-1. Decidir sobre los 6 puntos de la parada de la fase 6 (abajo).
-1bis. Decidir qué hacer con las **presentaciones tardías y la cesión de la palabra** —sesgo direccional en la medida principal—, con cinco opciones planteadas justo antes de esos 6 puntos.
-2. **Respaldar `data/raw/` fuera del repo.** 460 archivos, 75 MB, no están en git y reconstruirlos depende de que gob.mx siga sirviendo.
+**Para matar procesos de Windows desde bash:** `taskkill` quiere el **WINPID**, que es el *cuarto* campo de `ps -W`, no el PID de bash. Con el campo equivocado dice "correcto" y no mata nada.
 
 ---
 
-## Lo primero al retomar
-
-Verificar que todo sigue en pie:
+## Decisiones pendientes en detalle
 
 ```bash
 cd d:/PROYECTOS_PERSONALES/preguntas_matutinas
-PYTHONIOENCODING=utf-8 "C:/Users/User/anaconda3/envs/votaciones_corte/python.exe" -m pytest -q   # 120 pruebas
-ls data/raw | wc -l                                                                              # 460
+PYTHONIOENCODING=utf-8 "C:/Users/User/anaconda3/envs/votaciones_corte/python.exe" -m pytest -q   # 129
 ```
 
-Lo que hay en disco (todo en `.gitignore`):
+**Y antes de nada, verificar que no quedó un proceso vivo de ayer:**
 
-| ruta | contenido |
-|---|---|
-| `data/raw/` | 460 conferencias en HTML, 75 MB, **inmutable** |
-| `data/interim/urls.jsonl` | 464 URLs descubiertas |
-| `data/interim/turnos.jsonl` | 65,092 turnos |
-| `data/interim/hilos.jsonl` | 2,148 hilos |
-| `data/interim/conferencias.jsonl` | 460, con `tema_dia` |
-| `data/gold/EJEMPLO_*.xlsx` | 2 hojas de ejemplo, **ya codificadas por el humano** |
-| `assets/` | **material de terceros. NO se publica, NO se comparte, NO se nombra su autoría en archivos versionados.** |
+```bash
+ps -W | grep -c votaciones_corte      # debe ser 0
+```
 
-### PENDIENTE DE DECIDIR: presentaciones tardías y cesión de la palabra
+El 2026-08-28 la sesión se reinició y el Python de Windows **no murió con ella**: hubo dos procesos escribiendo al mismo checkpoint. No rompió nada —0 truncadas, 0 duplicados— pero duplica el gasto de API.
 
-Lo encontró el humano el 2026-08-27 leyendo la conferencia del 2026-01-22. **No se tocó nada; espera su decisión.**
+### Las tres cosas pendientes, en orden
 
-**El caso.** En el turno #70 alguien dice *«Muchas gracias. Por cierto, soy Gregorio Varela, de Cinco Radio. No me presenté.»* El parser abre su hilo ahí. Pero él ya venía preguntando desde el **#66**, y esos turnos quedaron acreditados a Oscar Zamudio, el periodista anterior.
+**1. Terminar la clasificación temática.** Va en **3,065 de 12,299 (25%)**. Ya es concurrente y corre a ~2.5 preguntas/segundo, así que lo que falta es **cerca de una hora** y unos **2 dólares**.
 
-**Por qué importa más de lo que parece.** Cuando alguien se presenta tarde, sus preguntas no se pierden: **se le acreditan a otro**. Son dos errores por caso, en direcciones opuestas. Hay **45 casos explícitos** en el corpus (`no me presenté`, `por cierto, soy…`), y Carlos Pozos aparece varias veces en esa lista. **Si un periodista tiene la costumbre de presentarse tarde, el pipeline lo subcuenta sistemáticamente y sobrecuenta a quien le tocó antes. Eso no es ruido, es sesgo direccional en la medida principal del proyecto.**
+```bash
+python scripts/clasificar_temas.py     # retoma del checkpoint, no repaga nada
+python scripts/reconstruir_temas.py    # SIEMPRE al terminar
+```
 
-**La señal que lo resolvería ya está capturada y sin usar.** Un turno antes, en el #65, la presidenta dice *«Vamos de este lado. A ver, el compañero»*. Eso es la cesión de la palabra, y vive en el campo `apartes`. Medido sobre el corpus:
+**2. Consolidar los asuntos y enseñarle los grupos grandes al humano.** `consolidar()` ya está escrita. **No dar por buenos los conteos de nivel 2 antes de esto.**
 
-| | |
-|---|---|
-| apartes que ceden la palabra | 2,262 (33% de todos) |
-| conferencias con al menos uno | 433 de 460 |
-| cesiones a 1–3 turnos del inicio de un hilo | 902 |
-| hilos actuales | 2,303 |
+**3. Los 6 puntos de la parada de la fase 6**, más la decisión sobre presentaciones tardías. Siguen sin resolverse y bloquean la fase 7.
 
-Y **es exactamente el dato que la regla metodológica 7 exige reportar** —a quién le dan la palabra no es aleatorio, la presidenta elige a dedo y lo dice en voz alta—. Está capturado y no se usa para nada.
+### Hallazgo del 2026-08-28 que cambia lo que promete el nivel 2
 
-**Las cinco opciones, tal como se le presentaron al humano:**
+Medido sobre las 3,065 clasificadas: **2,463 asuntos distintos, de los cuales el 92% aparece en UNA sola conferencia.** Solo 196 (8%) cruzan a una segunda, y apenas 80 duran más de 7 días.
 
-- **A. Retroceder desde la presentación tardía** hasta una frontera hacia atrás. Arregla los 45 con precisión; riesgo de robarle turnos al periodista anterior si la frontera falla.
-- **B. Cambiar el modelo: el hilo lo define la cesión de la palabra, no la presentación.** Estructuralmente correcto —una tanda empieza cuando alguien recibe el micrófono, no cuando dice su nombre— y arreglaría también el 25% de intervenciones que hoy faltan porque nadie se presenta. Es el cambio grande.
-- **C. Marcar la zona ambigua como `incierta`.** Honesto y barato, pero tira dato que sí se conoce.
-- **D. Dejárselo al modelo en la fase 7**, mandándole la zona de frontera.
-- **E. Señal de saludo completo.** Un turno de prensa que abre con saludo entero (*«Muy buenos días, Presidenta. Muy buenos días a todos.»*) a media tanda es alguien nuevo. Barata y complementaria.
+Es decir: **el asunto está capturando "el tema de esta tanda", no "una historia que vive semanas".** Cuando Dalila Escobar repite 7 veces `"Acuerdo Fiscalías México-Estados Unidos"`, las 7 son del **mismo día**.
 
-**Recomendación del agente: B por etapas, no de frente.**
+Eso no invalida el nivel 2 —sigue sirviendo para navegar y para ver de qué habla cada periodista— pero **sí desmiente la promesa de medir cuánto dura un tema en la conferencia**, que fue el argumento con el que se eligió la opción B de consolidación. Hay que decidir si:
 
-1. Extraer la cesión de palabra a su propio campo. Cero riesgo y es dato que el análisis necesita igual.
-2. Medir qué tan bien predice las fronteras contra los hilos actuales.
-3. Con ese número decidir si se vuelve la frontera o solo complementa.
+- la consolidación posterior sí junta los casos que hoy quedan separados por nombres distintos, y entonces la promesa se recupera; o
+- el nivel 2 se reetiqueta como "tema de la tanda" y la duración de una historia se mide de otra forma.
 
-**Trampa conocida de esa señal:** entre las cesiones más frecuentes están `Adelante, Iván`, `Adelante, Marcela`, `Adelante, Marcelo`, `Adelante, Ariadna`. **No son a periodistas: son a funcionarios**, a quienes la presidenta cede la palabra por su nombre de pila. Hay que separarlas o se meterían fronteras falsas.
-
-
-### Los 6 puntos que esperan decisión
-
-Cinco son correcciones de etiquetas; el sexto es criterio.
-
-1. **`PREGUNTA (VIDEOLLAMADA)` → tratar como prensa.** Hoy cuenta como funcionario: 36 turnos mal clasificados. Recomendación: cualquier etiqueta que empiece con `PREGUNTA` es prensa.
-2. **Unificar las 7 grafías de la presidenta**, incluidas dos erratas de transcripción (`RESIDENTA DE MÉXICO`, `SHEINBAUM PADO`) y una sobrante de campaña (`CANDIDATA A LA PRESIDENCIA`).
-3. **`INTERVENCIÓN HOMBRE` / `INTERVENCIÓN MUJER` y su variante por videollamada → ruido**, igual que `INTERVENCIÓN`. 27 turnos.
-4. **269 turnos de contaminación de video** en 62 conferencias (`VOZ MUJER`, `NIÑA`, `BENEFICIARIA DEL PROGRAMA…`). Caen como `anonimo`, así que **no ensucian el conteo de prensa**. ¿Filtrarlos por etiqueta, o dejarlos y excluirlos en el análisis? **Criterio del humano.**
-5. **Confirmar que `(ENLACE VIDEOLLAMADA)` NO es video.** 818 apariciones. Es gente participando a distancia que sí habla en la conferencia; hoy se trata como hablante normal.
-6. **Siete conferencias sin ningún hilo:** `2025-10-03` (0 turnos de prensa, probablemente no es mañanera), `2026-05-29`, `2025-05-21`, `2024-12-18`, `2026-05-20`, `2025-04-02`, `2025-04-07`. Las dos últimas tienen 29 y 32 turnos de prensa: **ahí se están perdiendo periodistas.**
-
-Al decidir, aplicar los cambios y **volver a correr `python -m estenograficas.parseo`**, que reescribe los tres JSONL completos.
-
-### Después, la fase 7
-
-Identidad: regex sobre los primeros 300 caracteres, el modelo solo sobre lo que el regex no resuelva, y luego canonicalización. **El plan de canonicalización ya se discutió con el humano:**
-
-1. Normalización determinista: plegar acentos y mayúsculas **solo para comparar**, quitar prefijos genéricos (`revista`, `diario`, `grupo`, `periódico`).
-2. **Anclar el medio al periodista**, que es el truco que sale de mirar los datos: una persona dice su nombre igual casi siempre pero su medio de tres formas distintas (`Karina Aguilar` → `Diario 24 Horas` 27 veces, `diario 24 Horas` 9, `24 Horas` 1). Evidencia mucho más fuerte que el parecido tipográfico.
-3. Embeddings locales más clustering aglomerativo para la cola.
-4. El humano aprueba los grupos dudosos.
-
-Sobre los datos: **345 grafías de periodista** con solo 13 grupos de variantes (problema fácil, casi todo acentos) contra **560 cadenas de medio** (problema difícil: eslóganes pegados, dos medios en un turno).
-
-Trampas ya identificadas: un periodista puede representar **dos medios a la vez** (`El Chapucero y Efecto Colateral`) y puede **cambiar de medio en el tiempo** —eso es señal, no ruido, y aplanarlo borra información real, así que la canonicalización tiene que mirar la fecha o al menos marcar esos casos—. Nada se sobreescribe: lo canónico va en `periodista_canonico`, con `metodo` y `confianza`.
-
-**Meta medible:** cerrar el hueco del **31%** contra el conteo manual externo (521 nuestras contra 752 suyas en enero–junio de 2026). Parte es recall de identificación, parte puede ser diferencia en la unidad de conteo; descomponerlo es tarea de esa fase.
+**Medirlo es lo primero que hay que hacer después de consolidar**, comparando el 8% de ahora contra el de después.
 
 ---
 
