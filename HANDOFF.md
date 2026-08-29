@@ -6,6 +6,50 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ---
 
+## Plan al 2026-08-28
+
+Escrito de noche, con el lote 1 ya codificado. Reemplaza la lista de «las cuatro cosas pendientes» de arriba en cuanto se ejecute.
+
+### La espera de una semana: se recorta a 72 horas, y no bloquea nada
+
+**Para qué existe.** La recodificación de 20 mide si el humano coincide **consigo mismo**. Si no coincide, un alfa bajo contra el modelo es inatribuible: no se sabe si falla el modelo o si las categorías están vagas. Es el único instrumento que separa esas dos cosas y por eso no se salta.
+
+**Por qué no puede ser el mismo día.** Recodificar recordando lo que se puso mide memoria, no claridad de las categorías, y sale alto por construcción. Es el mismo error que medir consistencia con tres corridas idénticas a temperatura cero.
+
+**72 horas es defendible** y es el mínimo usual en análisis de contenido. Una semana era conservador. Se recorta a 72 h y **se declara el intervalo** al reportar; lo que no se puede es que sea cero.
+
+**Y sobre todo: la espera no bloquea nada.** Solo bloquea el rediseño del libro de códigos en el caso de que salga mal. Todo lo demás corre en paralelo, incluido el alfa humano-modelo sobre las 150.
+
+### Ruta crítica
+
+| día | quién | qué |
+|---|---|---|
+| **2026-08-29 sáb** | humano | Los 5 arreglos del lote 1 (P-013, P-017, P-019, P-029, P-036) |
+| 2026-08-29 → 08-31 | humano | Los 120 del lote 2 |
+| **2026-08-31 lun** | agente | Clasificar postura con el modelo **solo sobre las 150**, tres corridas perturbadas. Cuesta centavos |
+| 2026-08-31 | agente | **Alfa humano vs modelo**, partido en fragmentos y sustantivas |
+| **2026-09-03 jue** | humano | Recodificar 20 del lote 1 a ciegas (72 h después del lote 1) |
+| 2026-09-03 | agente | Alfa intra-codificador. **Compuerta: si el humano no coincide consigo mismo, se rediseñan las categorías y se repite** |
+| **2026-09-04 vie** | agente | Corrida sobre el corpus completo, tres pasadas |
+
+Con una sola dimensión la corrida de postura sobre 22 mil preguntas baja de los ~$18 estimados para cuatro dimensiones a **unos $5**.
+
+### En paralelo, sin depender del humano
+
+1. **Recargar créditos y cerrar la clasificación temática.** Faltan 5,560, de las cuales 3,237 son puro `RESOURCE_EXHAUSTED` y 1,502 son repreguntas cortas que hay que remandar **con su contexto inmediato** —remedio ya validado: 3 de 3 salieron bien—. Total ~$3.
+2. **Arreglar los 7 hilos contaminados y el patrón `Nombre, servidor,`.** **Va después de que el humano termine las 150**, porque partir hilos renumera los `id_pregunta`. Al hacerlo hay que **re-enlazar la muestra de oro por texto**, no por id, para no perder la codificación.
+3. **Canonizar los ~620 nombres de medio.** No se resuelve consultando a nadie: la fuente externa tropieza con lo mismo.
+4. **Escribir el prompt de postura**, con las cuatro categorías, la regla del golpe y la regla de la premisa. Perturbación entre corridas: orden de las categorías y orden de los turnos de contexto.
+5. **Respaldar `data/raw/`** fuera del repo. Sigue pendiente desde hace días y es el activo caro.
+
+### Lo que NO se hace
+
+- **No se ajusta el prompt hasta que el alfa suba.** Si sale abajo de 0.6 se rediseñan las categorías, no el prompt.
+- **No se corre el modelo sobre el corpus antes de que las 150 estén codificadas.** Ya está a punto de cumplirse; no adelantarlo por prisa.
+- **No se mira el archivo de valoraciones externas** hasta tener resultados propios. Está registrado de antemano justo para eso.
+
+---
+
 ## Estado
 
 **Última actualización:** 2026-08-28, tarde. **La clasificación temática terminó**: 12,135 de 12,299 preguntas (98.7%), 164 rechazadas. Los asuntos ya están consolidados y el algoritmo que los consolida se corrigió (traía un defecto de fusión por cadenas, ver abajo).
