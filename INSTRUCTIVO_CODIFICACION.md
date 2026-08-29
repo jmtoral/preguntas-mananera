@@ -63,6 +63,31 @@ Lo mismo del otro lado:
 
 ---
 
+## La pregunta clave cuando hay un tercero de por medio: **¿quién da el golpe?**
+
+Salió del lote 1 y resuelve la confusión más frecuente.
+
+- Si lo da **la pregunta** —la premisa ya da por culpable al tercero— es `crítica a un tercero`.
+- Si la pregunta solo **tiende la mano** para que lo dé el gobierno, es `afín al gobierno`.
+
+> *«Hace unos días la gobernadora de Chihuahua, María Eugenia Campos…»* seguido del reclamo.
+
+`crítica a un tercero`. El golpe lo da la pregunta.
+
+> *«Me gustaría preguntarle su opinión acerca de si el feminismo es compatible con la ideología y el pensamiento de derecha.»*
+
+`afín al gobierno`. La pregunta no ataca a nadie: le entrega el micrófono para que ataque ella. Y en efecto lo hizo, largo.
+
+**Y el error que hay que evitar: `crítica a un tercero` no es «la pregunta menciona a un tercero».** Es contra quién va el reclamo. Si la pregunta habla de un alcalde, de un empresario o de Estados Unidos **pero le reclama al gobierno**, es `crítica al gobierno`. La prueba sigue siendo la misma: **¿quién queda mal si la pregunta tiene razón?**
+
+## Las peticiones van a `afín al gobierno`
+
+Decidido en el lote 1. Una pregunta que pide algo —*«¿podría incluirse la educación en empatía hacia los animales?»*, *«¿nos podría apoyar con este tema?»*— trata al gobierno como interlocutor benévolo y le da la ocasión de conceder. No es elogio, pero es del lado amable.
+
+**Consecuencia que hay que tener presente al leer los resultados:** `afín al gobierno` es entonces **más ancho que el elogio**. Contiene tres cosas — halago, plataforma para lucirse o para pegarle a un rival, y petición— y las tres tienen en común que le sirven al gobierno.
+
+**Excepción:** si la petición viene con reproche —*«llevamos tres años pidiéndolo y nada»*— es `crítica al gobierno`. El reproche manda sobre la petición.
+
 ## Más ejemplos trabajados
 
 > *«Oiga, y aprovechando el viaje, hablando de las reformas constitucionales hay quien piensa, percibe que hay cierta prisa en implementarlas… ¿Por qué la prisa? ¿Por qué no tomarse el tiempo de analizar estas reformas que afectan a todo el país?»*
@@ -117,6 +142,10 @@ Ejemplo real de la muestra:
 Sola es incodificable. Con lo que siguió se ve que el objeto es Salinas, y entonces sí se puede decidir.
 
 **Si aun con las dos columnas no se entiende, `no clasificable` y una nota.** No adivines: el corte está en la fuente, no es culpa tuya, y una decisión inventada contamina la calibración más que un hueco declarado.
+
+**Y si el turno no es una pregunta, también va `no clasificable`.** Hay turnos de prensa que son conversación pura —*«Estuve 12 años.»*, *«Van a hacer el Día de Muertos.»*—. Son turnos reales del corpus y por eso están en la muestra, pero no tienen postura que medir. Márcalos y sigue; **`no clasificable` es una respuesta, no un hueco**, y dejarlos en blanco sí es un hueco.
+
+**Un tercio de las preguntas del corpus tienen menos de 80 caracteres**, así que la muestra trae muchas. No es un defecto del muestreo: la conferencia es así. Al final la confiabilidad se va a reportar **partida en dos** —fragmentos y preguntas sustantivas— para saber si el instrumento sirve igual en las dos, en vez de un promedio que esconde la diferencia. Tú no tienes que hacer nada distinto: codifica las dos igual.
 
 ## Cuando dudes
 

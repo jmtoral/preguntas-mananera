@@ -109,6 +109,24 @@ Siete pruebas nuevas en `tests/test_temas.py`, incluida `test_no_encadena_por_un
 
 ## Hecho
 
+### Lote 1 de la muestra de oro: codificado y revisado (2026-08-28)
+
+**28 de 30 codificadas.** Distribución: `neutral` 14 (50%), `afín al gobierno` 7 (25%), `crítica a un tercero` 4 (14%), `crítica al gobierno` 3 (11%). Con n=28 no dice nada del corpus; sí dijo mucho del instrumento.
+
+**Tres decisiones tomadas en la parada, todas del humano:**
+
+1. **La regla del golpe.** Sus propios códigos ya la contenían sin nombrarla: en un caso anotó «invitación a atacar a la derecha» y codificó `afín`, en otro «critica a la gobernadora de Chihuahua» y codificó `crítica a un tercero`. La distinción que hace es **quién da el golpe**: si lo da la pregunta, `crítica a un tercero`; si la pregunta solo tiende la mano para que lo dé el gobierno, `afín al gobierno`. Escrita al instructivo.
+
+2. **Las peticiones van a `afín al gobierno`**, salvo que traigan reproche. **Consecuencia que hay que recordar al leer resultados: `afín` queda más ancho que el elogio** — contiene halago, plataforma y petición. Las tres le sirven al gobierno, pero no son lo mismo, y si algún día importa distinguirlas hay que volver a la columna de fragmentos.
+
+3. **Los fragmentos se codifican igual, pero el alfa se reporta partido en dos.** 13 de las 30 tienen menos de 80 caracteres; en el corpus completo son el 32%. La muestra es representativa y no se toca. Dato que motivó la decisión: **las tres `crítica al gobierno` cayeron todas en la mitad larga, ninguna en la corta.** Un solo número promediaría dos instrumentos distintos.
+
+**Dos deslices reconocidos por el humano** (P-017, P-029): los recodifica él. **El agente no tocó ningún código de la muestra**, ni siquiera para sugerir el valor correcto; solo señaló que el contexto y el código parecían no coincidir y preguntó qué había querido decir.
+
+**Un problema del agente, no del humano:** P-036 se codificó con información incompleta —el fragmento que escribió corresponde al turno anterior— porque la hoja vieja solo traía dos turnos previos y no traía «lo que siguió». P-013 quedó en blanco por lo mismo. Ambas hay que rehacerlas con la hoja nueva.
+
+**El humano llenó la v1 y no la v2.** No costó nada: `muestrear_oro.py` arrastra las respuestas por código y se verificó una por una —0 diferencias, 11 fragmentos y 1 nota conservados—. Hay respaldo fechado en `data/gold/`. La hoja buena vuelve a ser `muestra_oro_hoja.xlsx`.
+
 ### El libro de códigos pasó de cuatro dimensiones a una (2026-08-28)
 
 Decisión del humano, con el motivo explícito: **no va a escribir un artículo académico**, así que cuatro dimensiones ortogonales son un impuesto que no compra nada. `funcion` e `insistencia` no contestan la pregunta que le interesa.
