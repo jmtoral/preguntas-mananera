@@ -55,8 +55,40 @@ NIVEL 2 — asunto: el caso concreto del que trata la pregunta, en 4 a 9 palabra
 ASUNTOS YA USADOS (reutiliza literalmente cuando aplique):
 {vocab}
 
+Algunas entradas traen un bloque `CONTEXTO (no clasificar):` antes de
+`PREGUNTA:`. El contexto está solo para que entiendas de qué se habla:
+**clasifica únicamente lo que viene después de `PREGUNTA:`**. Si la pregunta es
+un fragmento suelto, el contexto es lo que te dice de qué caso trata.
+
 Devuelve SOLO JSON:
 {{"clasificacion": {{"<id>": {{"categoria": "", "asunto": ""}}, ...}}}}"""
+
+MARCA_PREGUNTA = "PREGUNTA:"
+"""Separa el contexto de la pregunta dentro de una entrada del lote.
+
+Existe porque el 42% de las preguntas del corpus tienen menos de 120 caracteres
+y son repreguntas que **no se sostienen solas**: «¿Habrá alguna fecha en
+particular?». Mandadas sin contexto, el modelo devuelve categoría vacía —medido:
+1,502 de un tirón—. Mandarlas con su turno previo es lo que la regla dura 4
+permite explícitamente, y en la prueba de la hoja de ejemplo recuperó 3 de 3.
+"""
+
+
+def con_contexto(texto: str, contexto: str) -> str:
+    """Arma la entrada del lote con su contexto rotulado."""
+    if not contexto:
+        return texto
+    return f"CONTEXTO (no clasificar): {contexto}\n{MARCA_PREGUNTA} {texto}"
+
+
+def solo_pregunta(entrada: str) -> str:
+    """Quita el contexto para guardar el fragmento de procedencia.
+
+    El campo `fragmento` debe justificar la clasificación con el texto de la
+    pregunta, no con el del turno anterior.
+    """
+    i = entrada.find(MARCA_PREGUNTA)
+    return entrada[i + len(MARCA_PREGUNTA):].strip() if i != -1 else entrada
 
 
 @dataclass
@@ -306,12 +338,19 @@ def clasificar_paralelo(
     vocab: list[str] | None = None,
     lote: int = LOTE,
     trabajadores: int = TRABAJADORES,
+    reintentar: set[str] | None = None,
 ) -> Iterator[Clasificacion]:
     """Igual que `clasificar` pero con varias peticiones a la vez.
 
     El vocabulario se comparte con un candado y se actualiza al cerrar cada
     lote. El checkpoint se escribe desde el hilo que consume, no desde los
     trabajadores, para que siga habiendo un solo escritor.
+
+    `reintentar` son ids ya rechazados que **sí** hay que volver a intentar: los
+    que fallaron por créditos agotados o por servicio caído no fallaron por el
+    dato, y sin esto quedarían fuera para siempre porque `procesados()` incluye
+    los rechazos. El rechazo anterior se conserva en el archivo —es la bitácora—
+    y el intento nuevo escribe su propio renglón.
     """
     import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -324,7 +363,7 @@ def clasificar_paralelo(
     cliente = genai.Client(api_key=gemini_api_key())
     vocab = vocab if vocab is not None else []
     candado = threading.Lock()
-    ya = ck.procesados()
+    ya = ck.procesados() - (reintentar or set())
     pendientes = [(i, t) for i, t in preguntas if i not in ya]
     trozos = [pendientes[k : k + lote] for k in range(0, len(pendientes), lote)]
 
@@ -369,5 +408,6 @@ def clasificar_paralelo(
                             vocab.append(asu)
                 ck.marcar_hecho(pid, categoria=cat, asunto=asu)
                 yield Clasificacion(
-                    pid, cat, asu, None, "llm", MODELO, texto[:MAX_CARACTERES]
+                    pid, cat, asu, None, "llm", MODELO,
+                    solo_pregunta(texto)[:MAX_CARACTERES],
                 )
