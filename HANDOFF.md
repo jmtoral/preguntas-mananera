@@ -6,47 +6,48 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ---
 
-## Plan al 2026-08-28
+## Plan al 2026-08-28 (segunda versión, la primera era demasiado)
 
-Escrito de noche, con el lote 1 ya codificado. Reemplaza la lista de «las cuatro cosas pendientes» de arriba en cuanto se ejecute.
+El humano leyó la primera versión y dijo: **«este plan está demencial y no avanza»**. Tenía razón. Seis frentes en paralelo, una semana de calendario, y el número que le interesa sin moverse. Esta versión es lo mínimo para llegar al número.
 
-### La espera de una semana: se recorta a 72 horas, y no bloquea nada
+### Lo que quiere saber, dicho por él
 
-**Para qué existe.** La recodificación de 20 mide si el humano coincide **consigo mismo**. Si no coincide, un alfa bajo contra el modelo es inatribuible: no se sabe si falla el modelo o si las categorías están vagas. Es el único instrumento que separa esas dos cosas y por eso no se salta.
+> «Me interesa clasificar las que están **en favor** y las que están **en contra** del gobierno. Las críticas a terceros suelen ser a favor del gobierno, y **lo neutral es lo que realmente pregunta**.»
 
-**Por qué no puede ser el mismo día.** Recodificar recordando lo que se puso mide memoria, no claridad de las categorías, y sale alto por construcción. Es el mismo error que medir consistencia con tres corridas idénticas a temperatura cero.
+**Eso no obliga a recodificar nada.** Las cuatro categorías que se están codificando son el esquema de **codificación**; sus tres cubetas son el esquema de **reporte**. Se colapsan así:
 
-**72 horas es defendible** y es el mínimo usual en análisis de contenido. Una semana era conservador. Se recorta a 72 h y **se declara el intervalo** al reportar; lo que no se puede es que sea cero.
+| se codifica | se reporta |
+|---|---|
+| `crítica al gobierno` | **en contra** |
+| `afín al gobierno` + `crítica a un tercero` | **a favor** |
+| `neutral` | **lo que realmente pregunta** |
 
-**Y sobre todo: la espera no bloquea nada.** Solo bloquea el rediseño del libro de códigos en el caso de que salga mal. Todo lo demás corre en paralelo, incluido el alfa humano-modelo sobre las 150.
+Codificar fino y reportar grueso es lo correcto: se puede colapsar después, no se puede desagregar. Y deja abierto separar halago de golpe-al-rival si algún día interesa.
 
-### Ruta crítica
+**Un pendiente honesto de esta decisión:** en el lote 1 se acordó mandar las **peticiones** a `afín al gobierno`, así que caen en «a favor». Pero una petición a nombre de los productores o de los padres de familia se parece más a «lo que realmente pregunta» que a un halago. **Hay que revisarlo antes de reportar**, y se puede revisar sin recodificar porque el humano dejó fragmento en cada fila.
 
-| día | quién | qué |
-|---|---|---|
-| **2026-08-29 sáb** | humano | Los 5 arreglos del lote 1 (P-013, P-017, P-019, P-029, P-036) |
-| 2026-08-29 → 08-31 | humano | Los 120 del lote 2 |
-| **2026-08-31 lun** | agente | Clasificar postura con el modelo **solo sobre las 150**, tres corridas perturbadas. Cuesta centavos |
-| 2026-08-31 | agente | **Alfa humano vs modelo**, partido en fragmentos y sustantivas |
-| **2026-09-03 jue** | humano | Recodificar 20 del lote 1 a ciegas (72 h después del lote 1) |
-| 2026-09-03 | agente | Alfa intra-codificador. **Compuerta: si el humano no coincide consigo mismo, se rediseñan las categorías y se repite** |
-| **2026-09-04 vie** | agente | Corrida sobre el corpus completo, tres pasadas |
+### La ruta, tres pasos
 
-Con una sola dimensión la corrida de postura sobre 22 mil preguntas baja de los ~$18 estimados para cuatro dimensiones a **unos $5**.
+**El único bloqueo real es dinero.** Los créditos de Gemini están agotados desde el 2026-08-28; sin recargar no corre nada.
 
-### En paralelo, sin depender del humano
+1. **El humano termina las 150.** Faltan 5 arreglos del lote 1 y los 120 del lote 2.
+2. **El agente escribe el prompt de postura y corre el corpus.** Una sola dimensión, cuatro valores, tres pasadas perturbadas. **~$5.** Cerrar la clasificación temática pendiente son **~$3** más.
+3. **Se reporta en las tres cubetas**, con el alfa contra las 150 al lado.
 
-1. **Recargar créditos y cerrar la clasificación temática.** Faltan 5,560, de las cuales 3,237 son puro `RESOURCE_EXHAUSTED` y 1,502 son repreguntas cortas que hay que remandar **con su contexto inmediato** —remedio ya validado: 3 de 3 salieron bien—. Total ~$3.
-2. **Arreglar los 7 hilos contaminados y el patrón `Nombre, servidor,`.** **Va después de que el humano termine las 150**, porque partir hilos renumera los `id_pregunta`. Al hacerlo hay que **re-enlazar la muestra de oro por texto**, no por id, para no perder la codificación.
-3. **Canonizar los ~620 nombres de medio.** No se resuelve consultando a nadie: la fuente externa tropieza con lo mismo.
-4. **Escribir el prompt de postura**, con las cuatro categorías, la regla del golpe y la regla de la premisa. Perturbación entre corridas: orden de las categorías y orden de los turnos de contexto.
-5. **Respaldar `data/raw/`** fuera del repo. Sigue pendiente desde hace días y es el activo caro.
+### Lo que NO detiene el número, y va después
 
-### Lo que NO se hace
+Todo esto es control de calidad o mejora, y ninguno bloquea el paso 3:
 
-- **No se ajusta el prompt hasta que el alfa suba.** Si sale abajo de 0.6 se rediseñan las categorías, no el prompt.
-- **No se corre el modelo sobre el corpus antes de que las 150 estén codificadas.** Ya está a punto de cumplirse; no adelantarlo por prisa.
-- **No se mira el archivo de valoraciones externas** hasta tener resultados propios. Está registrado de antemano justo para eso.
+- Alfa intra-codificador (recodificar 20 a las 72 h). Sirve para saber si un alfa bajo es culpa del modelo o de las categorías. Si el alfa humano-modelo sale bien, es casi trámite.
+- Los 7 hilos contaminados y el patrón `Nombre, servidor,`. Renumeran ids: van al final, re-enlazando la muestra por texto.
+- Canonizar los ~620 nombres de medio. Afecta los conteos **por medio**, no los conteos totales ni los de periodista.
+- Respaldar `data/raw/`.
+
+### Lo que sigue sin negociarse
+
+- **Las 150 se codifican antes de correr el modelo sobre el corpus.** Está casi cumplido; no adelantarlo por prisa.
+- **Si el alfa sale bajo se rediseñan las categorías, no el prompt.**
+- **No se abre el archivo de valoraciones externas** hasta tener resultados propios.
 
 ---
 
