@@ -146,3 +146,4 @@ with open(salida, "a", encoding="utf-8") as f:
 vp.write_text(json.dumps(vocab, ensure_ascii=False), encoding="utf-8")
 print(f"\nnuevas: {n:,}   hechas: {len(ck.hechos()):,}   "
       f"rechazadas: {len(ck.rechazados()):,}", flush=True)
+print(f"GASTO REAL: {gasto.resumen()}", flush=True)

@@ -17,6 +17,7 @@ import argparse
 import collections
 import datetime as dt
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -27,6 +28,31 @@ from estenograficas.config import paths  # noqa: E402
 from estenograficas.temas_dos_niveles import _bolsa, consolidar  # noqa: E402
 
 
+SIN_ASUNTO = "(el modelo no pudo nombrar el asunto)"
+
+# El modelo, ante un fragmento que no entiende, a veces devuelve una categoría
+# válida pero un «asunto» que no es un tema sino una excusa: «pregunta
+# incompleta», «No es una pregunta», «Agradecimiento a la Presidenta». Pasan la
+# validación porque solo se verifica la categoría contra la lista cerrada.
+#
+# Medido el 2026-08-28: 1,583 preguntas, el 7.3%, con 280 etiquetas de éstas.
+# Sin filtrarlas, el grupo más grande de la consolidación resultó ser
+# «pregunta incompleta» con 188 variantes: un montón de basura disfrazado de
+# tema, que además contamina cualquier conteo por asunto.
+_META = re.compile(
+    r"pregunta (incompleta|no formulada)|no es una pregunta"
+    r"|comentario (de |informal |incompleto |deportivo )?periodista"
+    r"|agradecimiento|turno de palabra|no[_ ]aplica|sin contexto"
+    r"|informaci[oó]n insuficiente|saludo|despedida|fragmento",
+    re.IGNORECASE,
+)
+
+
+def es_meta(asunto: str) -> bool:
+    """El «asunto» no nombra un tema, describe por qué el modelo no pudo."""
+    return bool(_META.search(asunto))
+
+
 def jaccard(a: str, b: str) -> float:
     A, B = _bolsa(a), _bolsa(b)
     return len(A & B) / max(1, len(A | B))
@@ -34,8 +60,8 @@ def jaccard(a: str, b: str) -> float:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--umbral", type=float, default=0.5,
-                    help="Jaccard mínimo contra el representante (0.5 por omisión)")
+    ap.add_argument("--umbral", type=float, default=0.6,
+                    help="Jaccard mínimo contra el representante (0.6 por omisión)")
     ap.add_argument("--minimo", type=int, default=3,
                     help="variantes mínimas para listar un grupo en el reporte")
     args = ap.parse_args()
@@ -47,7 +73,9 @@ def main() -> int:
         return 1
 
     filas = [json.loads(l) for l in origen.read_text(encoding="utf-8").splitlines() if l.strip()]
-    crudos = [f["asunto"] for f in filas if f.get("asunto")]
+    todos = [f["asunto"] for f in filas if f.get("asunto")]
+    crudos = [a for a in todos if not es_meta(a)]
+    n_meta = len(todos) - len(crudos)
 
     t0 = time.time()
     mapa = consolidar(crudos, umbral_jaccard=args.umbral)
@@ -56,6 +84,11 @@ def main() -> int:
     grupos: dict[str, set[str]] = collections.defaultdict(set)
     for crudo, canon in mapa.items():
         grupos[canon].add(crudo)
+    # Las meta-etiquetas van todas a un mismo cubo, señalado como tal, en vez de
+    # quedar sueltas fingiendo ser temas distintos.
+    for a in set(todos):
+        if es_meta(a):
+            mapa[a] = SIN_ASUNTO
     fusionan = {k: sorted(v) for k, v in grupos.items() if len(v) > 1}
 
     conferencias: dict[str, set[str]] = collections.defaultdict(set)
@@ -87,6 +120,8 @@ def main() -> int:
     )
 
     print(f"consolidado en {seg:.1f}s con umbral {args.umbral}")
+    print(f"  meta-etiquetas     : {len({a for a in todos if es_meta(a)}):,} distintas, "
+          f"{n_meta:,} preguntas ({100 * n_meta / len(todos):.1f}%) -> {SIN_ASUNTO}")
     print(f"  asuntos crudos     : {len(set(crudos)):,}")
     print(f"  asuntos canónicos  : {len(grupos):,}  ({len(fusionan)} grupos fusionan)")
     print(f"  grupo más grande   : {max(len(v) for v in fusionan.values())} variantes")

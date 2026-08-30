@@ -204,6 +204,26 @@ Un error propio, corregido: la primera versión del detector descartaba por pala
 
 **`INSTRUCTIVO_CODIFICACION.md`**, con 10 ejemplos trabajados verificados por cotejo como fuera de las 150. Deja escrito que los ejemplos son lectura del agente y que eso infla el acuerdo, para que se reporte junto al número. El humano eligió esa opción a sabiendas, sobre la alternativa de codificar 10 en frío primero.
 
+### Clasificación temática TERMINADA al 99.9%, y la lección de los tokens de pensamiento
+
+**21,805 de 21,826 preguntas útiles.** Lo que queda sin clasificar son 640 por debajo de 12 caracteres —por diseño, con su razón en rechazos— y 21 sueltas.
+
+**El error de estimación que hay que no repetir.** Estimé una corrida en $1.08 y costó cerca de $5. Factor 4.6.
+
+**Causa:** `gemini-2.5-flash` trae *thinking* encendido por omisión y **esos tokens se facturan a precio de salida** ($2.50/M, ocho veces la entrada). La fórmula suponía salida ≈ 25% de la entrada, o sea ningún pensamiento.
+
+**Corregido de dos formas.** `thinking_budget=0` —esto es clasificación con esquema fijo, no necesita razonar— y, más importante, **se dejó de estimar**: la clase `Gasto` en `temas_dos_niveles.py` acumula `usage_metadata` real, incluido `thoughts_token_count`, y el runner imprime el costo cada 100 preguntas y al terminar. Verificado en la última corrida: estimado $0.05, contador real $0.03 a las 100 de 185.
+
+**Esto importa para la corrida de postura.** Con el mismo error, los $13.45 estimados habrían sido ~$60. Ahora la estimación se puede calibrar con tokens medidos de este mismo corpus.
+
+**Dos defectos de la consolidación, encontrados y corregidos:**
+
+1. **El 7.6% de los asuntos no eran temas.** Ante un fragmento, el modelo a veces devolvía categoría válida pero un asunto como `pregunta incompleta`, `No es una pregunta`, `Agradecimiento a la Presidenta`. Pasaban porque solo se valida la *categoría* contra la lista cerrada, no el *asunto*. Son **1,658 preguntas y 282 etiquetas**, y formaban el grupo más grande de la consolidación —188 variantes de basura—. Ahora se detectan y van todas a `(el modelo no pudo nombrar el asunto)`, que es honesto y no finge ser un tema.
+
+2. **El umbral 0.5 fusionaba casos distintos.** `visita presidencial a Washington` se tragó `Visita presidencial a Acapulco`, `a Mexicali`, `a Sonora`. El problema es que **la palabra que distingue es el nombre propio** y compartir dos genéricas da Jaccard exacto de 0.5. Medido a varios umbrales, **0.60** es el punto: sigue fusionando 728 grupos reales y el mayor baja de 29 a 11 variantes.
+
+**Estado final de la capa temática:** 14,623 asuntos canónicos, 728 grupos, el mayor de 11. El 90% aparece en una sola conferencia y 1,152 duran siete días o más.
+
 ### Conteo de palabras: hallazgo con su confusor medido (2026-08-28)
 
 Se puede contar cuánto habla cada quien sin clasificar nada. Sobre el corpus completo:
