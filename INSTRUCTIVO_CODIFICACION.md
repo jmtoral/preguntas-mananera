@@ -20,18 +20,17 @@ Todas las preguntas de este instructivo están **fuera** de las 150. Ninguna es 
 
 ---
 
-## Una sola columna, cuatro valores
+## Una sola columna, tres valores
 
 | valor | qué es |
 |---|---|
 | `crítica al gobierno` | pone en aprieto al gobierno federal: señala contradicción, fracaso, omisión, opacidad |
-| `afín al gobierno` | lo halaga, da por buena su versión, o le ofrece plataforma para lucirse |
-| `crítica a un tercero` | le pega a la oposición, a un actor externo, a un empresario, a la prensa |
+| `afín al gobierno` | le sirve: lo halaga, da por buena su versión, le ofrece plataforma, le pide algo, **o le pega a un rival suyo** |
 | `neutral` | pide un dato o una explicación sin carga en ninguna dirección |
 
 Y `no clasificable` cuando de verdad no se puede, que es una respuesta y no un hueco.
 
-**Por qué existe `crítica a un tercero`.** El 15% de las preguntas habla de la oposición o de un actor externo. Una pregunta durísima contra García Luna, contra Salinas Pliego o contra Trump no es crítica al gobierno ni lo halaga, pero tampoco es neutral: favorece al gobierno sin ser un halago. Sin esta categoría acabaría revuelta con las peticiones de dato, y es de las cosas más interesantes que tiene el corpus.
+**Hubo un cuarto valor y se fusionó.** `crítica a un tercero` existía aparte con el argumento de que pegarle a la oposición favorece al gobierno sin ser un halago. Codificar las 150 lo desmintió: se usó 8 veces de 150 y el modelo ni una en 30. Ahora **pegarle a un rival del gobierno es `afín al gobierno`**, porque le sirve igual. No cambió ningún resultado: los dos ya caían en la misma cubeta.
 
 **Por qué no hay «de interés público».** Porque no está en el mismo eje que las demás: mide el mérito de la pregunta, no su dirección, y casi todo el buen periodismo es crítico *y* de interés público a la vez. Además, ponerle ese nombre a una categoría afirma que las otras no lo son, y este trabajo mide y describe, no adjetiva.
 
@@ -59,7 +58,7 @@ Lo mismo del otro lado:
 
 > *«¿Qué tanto daño ha hecho en la Ciudad de México este cártel inmobiliario encabezado por el nuevo dirigente del PAN?»*
 
-`crítica a un tercero`. Aquí la premisa ya dio por probado que hay un cártel inmobiliario y que lo encabeza el dirigente del PAN. La pregunta no es si existe, es cuánto daño hizo.
+`afín al gobierno`. Aquí la premisa ya dio por probado que hay un cártel inmobiliario y que lo encabeza el dirigente del PAN. La pregunta no es si existe, es cuánto daño hizo.
 
 ---
 
@@ -67,18 +66,17 @@ Lo mismo del otro lado:
 
 Salió del lote 1 y resuelve la confusión más frecuente.
 
-- Si lo da **la pregunta** —la premisa ya da por culpable al tercero— es `crítica a un tercero`.
-- Si la pregunta solo **tiende la mano** para que lo dé el gobierno, es `afín al gobierno`.
+Las dos van a `afín al gobierno`: tanto si **la pregunta** da el golpe —la premisa ya da por culpable al tercero— como si solo **tiende la mano** para que lo dé el gobierno. Le sirve igual.
 
 > *«Hace unos días la gobernadora de Chihuahua, María Eugenia Campos…»* seguido del reclamo.
 
-`crítica a un tercero`. El golpe lo da la pregunta.
+`afín al gobierno`. El golpe lo da la pregunta, y va contra un rival del gobierno.
 
 > *«Me gustaría preguntarle su opinión acerca de si el feminismo es compatible con la ideología y el pensamiento de derecha.»*
 
 `afín al gobierno`. La pregunta no ataca a nadie: le entrega el micrófono para que ataque ella. Y en efecto lo hizo, largo.
 
-**Y el error que hay que evitar: `crítica a un tercero` no es «la pregunta menciona a un tercero».** Es contra quién va el reclamo. Si la pregunta habla de un alcalde, de un empresario o de Estados Unidos **pero le reclama al gobierno**, es `crítica al gobierno`. La prueba sigue siendo la misma: **¿quién queda mal si la pregunta tiene razón?**
+**El error que hay que evitar: hablar de un tercero no basta.** Lo que cuenta es contra quién va el reclamo. Si la pregunta habla de un alcalde, de un empresario o de Estados Unidos **pero le reclama al gobierno**, es `crítica al gobierno`. La prueba sigue siendo la misma: **¿quién queda mal si la pregunta tiene razón?**
 
 ## Las peticiones van a `afín al gobierno`
 
@@ -104,11 +102,11 @@ Decidido en el lote 1. Una pregunta que pide algo —*«¿podría incluirse la e
 
 > *«¿Cuál es su opinión de que a Fox y Calderón se nombrara persona non grata?»*
 
-`crítica a un tercero`. El objeto son dos expresidentes de oposición y la pregunta se apoya en una sanción ya impuesta.
+`afín al gobierno`. El objeto son dos expresidentes de oposición y la pregunta se apoya en una sanción ya impuesta.
 
 > *«Insistir en el tema de García Luna: ¿Cree que esta sentencia da un poco de justicia a todas las víctimas que dejó la guerra contra el narco desde 2006 hasta 2012?»*
 
-`crítica a un tercero`. La premisa atribuye las víctimas a la guerra de gobiernos anteriores.
+`afín al gobierno`. La premisa atribuye las víctimas a la guerra de gobiernos anteriores.
 
 ---
 
@@ -151,7 +149,7 @@ Sola es incodificable. Con lo que siguió se ve que el objeto es Salinas, y ento
 
 - **Si caben dos, elige la que carga más peso y escribe la duda.** La columna `notas / dudas` vale tanto como la otra: el lote de 30 existe para encontrar dónde las definiciones fallan, y eso solo se ve en tus dudas.
 - **Si la pregunta no se sostiene sola** —hay fragmentos como *«La hizo a un lado.»*—, mira el contexto. Si con él se entiende, códificala; si no, `no clasificable` y una nota. **No adivines.**
-- **Si es una crítica al gobierno y a un tercero a la vez**, gana el gobierno: es el eje que interesa medir.
+- **Si golpea al gobierno y a un tercero a la vez**, gana `crítica al gobierno`: es el eje que interesa medir.
 - La columna `fragmento que te hizo decidir` es la frase exacta que te hizo elegir. Con cinco o seis palabras basta. Sirve para que después se pueda auditar la decisión sin volver a leer todo.
 
 ## Antes de empezar

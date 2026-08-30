@@ -105,11 +105,13 @@ Estas ya costaron trabajo descubrirlas. No las vuelvas a descubrir.
 
 | Campo | Valores |
 |---|---|
-| `postura` | crítica al gobierno, afín al gobierno, **crítica a un tercero**, neutral |
+| `postura` | crítica al gobierno, afín al gobierno, neutral |
 
-Admite `no clasificable`. Toda clasificación incluye el fragmento textual que la justifica.
+Admite `no clasificable`, que es un hueco declarado y no una postura. Toda clasificación incluye el fragmento textual que la justifica.
 
-**`crítica a un tercero` no es un adorno: es la categoría que sostiene la regla vieja de no colapsar el eje.** Una pregunta durísima contra la oposición favorece al gobierno sin ser un halago, y sin este valor caería en `neutral` junto con las peticiones de dato. Medido sobre el corpus: **el 15% de las preguntas habla de la oposición o de un actor externo.**
+**Hubo un cuarto valor, `crítica a un tercero`, y se fusionó con `afín al gobierno` el 2026-08-30**, por decisión del humano tras codificar las 150 a mano: «pegarle a un rival del gobierno le sirve al gobierno, siempre». El argumento para separarlos era que favorece sin halagar; el ejercicio lo desmintió por dos lados: **el humano lo usó 8 veces de 150 y el modelo ni una en 30.** Una categoría que ni la persona ni la máquina alcanzan con soltura está mal definida.
+
+Fusionarla **no cambió ningún resultado**: los dos valores ya caían en la misma cubeta al reportar. Lo que se pierde —separar el halago del golpe al rival— queda recuperable por el fragmento y por la capa temática.
 
 **Por qué NO se usan las tres categorías de uso periodístico** (crítica / afín / de interés público), que fue la propuesta inicial:
 

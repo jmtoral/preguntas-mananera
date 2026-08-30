@@ -6,7 +6,9 @@ Copia todo lo que va debajo de la línea y pégalo como primer mensaje.
 
 Estoy analizando las conferencias matutinas de la Presidencia de México. El proyecto vive en `d:\PROYECTOS_PERSONALES\preguntas_matutinas`. **Lee `CLAUDE.md` y `HANDOFF.md` antes de proponer nada** — el estado del 2026-08-30 está al principio del HANDOFF.
 
-**Lo que quiero saber:** de las ~22 mil preguntas que la prensa le hace a la presidenta, **cuántas van a favor del gobierno y cuántas en contra**. Las críticas a terceros cuentan como a favor. Lo neutral es lo que realmente pregunta.
+**Lo que quiero saber:** de las ~22 mil preguntas que la prensa le hace a la presidenta, **cuántas van a favor del gobierno y cuántas en contra**. Lo neutral es lo que realmente pregunta.
+
+**Son tres valores, no cuatro.** Hubo un cuarto, `crítica a un tercero`, y lo fusioné con `afín al gobierno` después de codificar las 150: pegarle a un rival del gobierno le sirve al gobierno, siempre. Codificándolas a mano me quedó claro. No lo vuelvas a abrir.
 
 ## Dónde va el trabajo
 
@@ -20,11 +22,18 @@ Lo que falta es escalarlo a las 21,826 y desagregarlo por periodista y medio.
 
 ## Tu tarea, en este orden
 
-**1. Arreglar el prompt de postura.** Los tres problemas están diagnosticados en el HANDOFF:
+**1. Arreglar el prompt de postura.** El problema está aislado y es uno solo:
 
-- `crítica a un tercero` no se dispara nunca (0 del modelo contra 4 míos)
-- devuelve `no clasificable` de más (8 contra 2 míos), en fragmentos que yo sí resolví con el contexto
-- confunde `neutral` con `afín al gobierno` cuando la pregunta invita a lucirse sin afirmar nada
+| valor | yo | modelo |
+|---|---:|---:|
+| crítica al gobierno | 3 | 6 |
+| afín al gobierno | 11 | 7 |
+| neutral | 14 | 8 |
+| **no clasificable** | **2** | **9** |
+
+**El modelo se raja.** Nueve `no clasificable` contra mis dos, y eso solo explica 7 de los 16 desacuerdos. La regla 6 del prompt quedó demasiado fuerte: yo sí resolví esos fragmentos usando el contexto, el modelo se rinde antes. Suavízala —`no clasificable` solo para lo que de verdad no es pregunta, tipo «Ok, muchas gracias»— y vuelve a medir.
+
+Ojo: en P-017 y P-029 el modelo coincide con mi juicio **corregido**, no con lo que quedó en la hoja. Reconocí esos dos como deslices y no apliqué la corrección.
 
 **Ajusta contra los 30 del lote 1 y NO toques los 120 del lote 2.** Ésa es la razón de haber partido la muestra: el prompt se ajusta con el lote 1, el alfa que voy a publicar sale del lote 2. Tocar los 120 sería entrenar contra la validación.
 
@@ -32,7 +41,7 @@ Lo que falta es escalarlo a las 21,826 y desagregarlo por periodista y medio.
 
 **3. Si el alfa pasa de 0.6, correr el corpus completo.** Si no pasa, **se rediseñan las categorías, no el prompt.**
 
-**4. Reportar** en tres cubetas: en contra / a favor (afín + crítica a tercero) / lo que realmente pregunta.
+**4. Reportar** en tres cubetas: **en contra** / **a favor** / **lo que realmente pregunta**.
 
 ## Cómo quiero que trabajes
 

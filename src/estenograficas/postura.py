@@ -1,12 +1,12 @@
-"""Clasificación de postura: una dimensión, cuatro valores.
+"""Clasificación de postura: una dimensión, tres valores más un hueco.
 
 El instrumento que contesta la pregunta del proyecto: de las preguntas que la
 prensa le hace a la presidenta, cuántas van a favor del gobierno y cuántas en
 contra.
 
-**Se codifica fino y se reporta grueso.** Cuatro valores al clasificar; al
-reportar se colapsan en tres cubetas (`CUBETAS`). Colapsar después se puede,
-desagregar no.
+Tres valores —`crítica al gobierno`, `afín al gobierno`, `neutral`— más
+`no clasificable`, que es un hueco declarado y no una postura. Ver `VALORES`
+para por qué se fusionó el cuarto valor que hubo antes.
 
 Las reglas del prompt no las inventó el modelo ni el agente: salieron de la
 parada del lote 1, de la codificación a mano. Están también en
@@ -37,28 +37,44 @@ MAX_CARACTERES = 4000
 VALORES = [
     "crítica al gobierno",
     "afín al gobierno",
-    "crítica a un tercero",
     "neutral",
     "no clasificable",
 ]
+"""Tres valores más el hueco. Decidido el 2026-08-30 por el humano, después de
+codificar las 150 a mano.
+
+Antes había un cuarto valor, `crítica a un tercero`, con el argumento de que
+pegarle a la oposición favorece al gobierno **sin ser un halago** y que colapsar
+los dos borraría esa distinción. El ejercicio de codificar lo desmintió por dos
+lados: el humano lo usó 8 veces de 150 (5.3%) y **el modelo no lo usó ni una vez
+en 30**. Una categoría que ni la persona ni la máquina alcanzan con soltura está
+mal definida, no mal aplicada.
+
+Y no costó nada fusionarla: los dos valores ya caían en la misma cubeta al
+reportar, así que **el resultado es idéntico** —49 preguntas a favor, se cuenten
+como 41+8 o como 49—. Lo único que se pierde es poder separar «te halaga» de «le
+pega a tu rival», y para eso queda la columna de fragmentos y la capa temática.
+
+El caso que parecía una excepción ya lo cubre la regla 3: si le pegas a un
+tercero pero el reclamo aterriza en el gobierno —un gobernador de Morena, un
+cártel que el gobierno no controla— es `crítica al gobierno`."""
 
 CUBETAS = {
     "en contra": ["crítica al gobierno"],
-    "a favor": ["afín al gobierno", "crítica a un tercero"],
+    "a favor": ["afín al gobierno"],
     "lo que realmente pregunta": ["neutral"],
 }
-"""Cómo se reportan los cuatro valores. `no clasificable` queda fuera de la base."""
+"""Cómo se reportan. `no clasificable` queda fuera de la base."""
 
 _DEFINICIONES = {
     "crítica al gobierno":
         "pone en aprieto al gobierno federal: señala contradicción, fracaso, "
         "omisión u opacidad, o contrapone su versión con otra",
     "afín al gobierno":
-        "lo halaga, da por buena su versión, le ofrece plataforma para lucirse, "
-        "o le pide algo tratándolo como interlocutor benévolo",
-    "crítica a un tercero":
-        "le pega a la oposición, a un actor externo, a un empresario o a la "
-        "prensa: la premisa ya da por culpable al tercero",
+        "le sirve al gobierno: lo halaga, da por buena su versión, le ofrece "
+        "plataforma para lucirse, le pide algo tratándolo como interlocutor "
+        "benévolo, o **le pega a un rival suyo** — a la oposición, a un actor "
+        "externo, a un empresario",
     "neutral":
         "pide un dato o una explicación sin carga en ninguna dirección",
     "no clasificable":
@@ -73,12 +89,12 @@ _REGLAS = """REGLAS DE DECISIÓN, en orden de prioridad:
    gobierno. Mismo tema, signo distinto, y la diferencia está entera en la
    premisa.
 
-2. ¿QUIÉN DA EL GOLPE? Si lo da la pregunta —la premisa ya da por culpable al
-   tercero— es «crítica a un tercero». Si la pregunta solo tiende la mano para
-   que lo dé el gobierno, es «afín al gobierno». «¿Qué tanto daño ha hecho este
-   cártel inmobiliario encabezado por el dirigente del PAN?» golpea: crítica a
-   un tercero. «¿Cuál es su opinión sobre si el feminismo es compatible con la
-   derecha?» tiende la mano: afín al gobierno.
+2. PEGARLE A UN RIVAL DEL GOBIERNO ES «AFÍN AL GOBIERNO». No hace falta que lo
+   halague: le sirve igual. «¿Qué tanto daño ha hecho este cártel inmobiliario
+   encabezado por el dirigente del PAN?» da por probado el cargo contra la
+   oposición: afín al gobierno. «¿Cuál es su opinión sobre si el feminismo es
+   compatible con la derecha?» le tiende la mano para que pegue ella: también
+   afín al gobierno.
 
 3. SI HABLA DE UN TERCERO PERO LE RECLAMA AL GOBIERNO, ES CRÍTICA AL GOBIERNO.
    La prueba: ¿quién queda mal si la pregunta tiene razón? «Esos casos de

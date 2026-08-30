@@ -22,19 +22,42 @@ El humano terminó la muestra de oro completa. Sobre 135 clasificables (15 fuero
 
 Dos pendientes que no mueven la conclusión pero hay que cerrar antes de publicar: **P-017 y P-029 quedaron en `crítica a un tercero`** cuando el humano dijo que eran deslices y van a `crítica al gobierno` (subiría «en contra» a 19), y **las peticiones cuentan en «a favor»**, que hay que revisar con la columna de fragmentos.
 
-### El clasificador de postura existe y la primera prueba salió mal
+### El libro de códigos bajó a TRES valores (2026-08-30)
 
-`src/estenograficas/postura.py` y `scripts/clasificar_postura.py`. Una dimensión, cuatro valores, tres pasadas perturbadas —orden de las categorías y posición del bloque de contexto—, con `Gasto` midiendo el costo real.
+Decisión del humano después de codificar las 150 a mano: **«crítica a un tercero es afinidad al gobierno, siempre; este ejercicio me lo confirmó.»**
 
-**Probado sobre los 30 del lote 1: 47% de coincidencia con el humano.** Muy por debajo de lo aceptable. Tres patrones, todos del prompt y no del dato:
+El cuarto valor existía con el argumento de que pegarle a la oposición favorece al gobierno **sin ser un halago**, y que colapsarlos borraría esa distinción. El ejercicio lo desmintió por dos lados: **el humano lo usó 8 veces de 150 (5.3%) y el modelo no lo usó ni una vez en 30.** Una categoría que ni la persona ni la máquina alcanzan con soltura está mal definida, no mal aplicada.
 
-1. **`crítica a un tercero` no se disparó ni una vez** (0 del modelo contra 4 del humano). La categoría existe en el prompt pero el modelo no la alcanza. Es la más importante del esquema: sin ella, todo lo que le pega a la oposición cae en neutral o en crítica al gobierno.
-2. **Se raja de más:** 8 `no clasificable` contra 2 del humano, todos en fragmentos cortos que el humano sí resolvió con el contexto. La instrucción de «no adivines» quedó demasiado fuerte.
-3. **Confunde `neutral` con `afín`** en preguntas que invitan a lucirse sin afirmar nada (P-024, P-087, P-108, P-132). La regla de la premisa está escrita pero no discrimina bien en ese borde.
+**Fusionarla no cambió el resultado.** Los dos valores ya caían en la misma cubeta al reportar: 49 preguntas a favor, se cuenten como 41+8 o como 49. El 36.3% es idéntico.
 
-Dato a favor del modelo: en **P-017** dijo `crítica al gobierno`, que es el valor **corregido** del humano, no el que quedó en la hoja.
+Lo que se pierde es poder separar «te halaga» de «le pega a tu rival». Queda recuperable por la columna de fragmentos y por la capa temática.
 
-**Iterar el prompt con estos 30 es legítimo y los 120 se quedan intactos.** Ésa fue la razón de partir la muestra: la selección de modelo y el ajuste del prompt se hacen sobre el lote 1, el alfa que se reporta sale del lote 2. Ajustar contra las 150 completas sí sería entrenar contra la validación.
+El caso que parecía excepción lo cubre la regla 3: si le pegas a un tercero pero el reclamo aterriza en el gobierno —un gobernador de Morena, un cártel que el gobierno no controla— es `crítica al gobierno`.
+
+**Valores vigentes:** `crítica al gobierno`, `afín al gobierno`, `neutral`, más `no clasificable` que es un hueco declarado.
+
+### El clasificador de postura existe, y falla por una sola cosa
+
+`src/estenograficas/postura.py` y `scripts/clasificar_postura.py`. Tres pasadas perturbadas —orden de las categorías y posición del bloque de contexto—, checkpoint por `id#pasada`, `Gasto` midiendo el costo real. El runner **se niega** a correr sobre el corpus si la muestra de oro no está codificada.
+
+**Probado dos veces sobre los 30 del lote 1: 47% de coincidencia con cuatro valores y 47% con tres.** La fusión no movió la aguja porque el problema estaba en otro lado, y ahora que está aislado se ve solo:
+
+| valor | humano | modelo |
+|---|---:|---:|
+| crítica al gobierno | 3 | 6 |
+| afín al gobierno | 11 | 7 |
+| neutral | 14 | 8 |
+| **no clasificable** | **2** | **9** |
+
+**El modelo se raja: 9 `no clasificable` contra 2 del humano, y eso explica 7 de los 16 desacuerdos.** La regla 6 del prompt —«si es un fragmento que ni con el contexto se entiende, no adivines»— quedó demasiado fuerte. El humano sí resolvió esos fragmentos usando el contexto; el modelo se rinde antes.
+
+**Ése es el arreglo siguiente, y es uno solo.** Suavizar la regla 6: reservar `no clasificable` para lo que de verdad no es una pregunta —«Ok, muchas gracias»— y exigir que use el contexto antes de rendirse. Si eso sube la coincidencia a ~70%, el resto son bordes finos.
+
+Dato importante: en **P-017 y P-029 el modelo coincide con el juicio CORREGIDO del humano**, no con el que quedó escrito en la hoja. El humano reconoció esos dos como deslices y nunca aplicó la corrección. Si se aplican, la coincidencia sube sola.
+
+**Iterar el prompt con estos 30 es legítimo; los 120 del lote 2 siguen sin tocarse.** Ésa fue la razón de partir la muestra: el prompt se ajusta con el lote 1, el alfa que se publica sale del lote 2.
+
+Las corridas con el prompt de cuatro valores quedaron archivadas como `postura_v1_4valores.*` en `data/checkpoints/` y `data/interim/`, por si hay que comparar.
 
 ### Costos, ya medidos y no estimados
 
