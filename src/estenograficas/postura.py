@@ -68,50 +68,77 @@ CUBETAS = {
 
 _DEFINICIONES = {
     "crítica al gobierno":
-        "pone en aprieto al gobierno federal: señala contradicción, fracaso, "
-        "omisión u opacidad, o contrapone su versión con otra",
+        "la pregunta AFIRMA algo malo del gobierno federal: un fracaso, una "
+        "omisión, una contradicción, una versión que contradice la oficial",
     "afín al gobierno":
-        "le sirve al gobierno: lo halaga, da por buena su versión, le ofrece "
-        "plataforma para lucirse, le pide algo tratándolo como interlocutor "
-        "benévolo, o **le pega a un rival suyo** — a la oposición, a un actor "
-        "externo, a un empresario",
+        "la pregunta AFIRMA algo bueno del gobierno, o algo malo de un rival "
+        "suyo —la oposición, un empresario, un gobierno extranjero—",
     "neutral":
-        "pide un dato o una explicación sin carga en ninguna dirección",
+        "la pregunta NO AFIRMA NADA: pide un dato, una opinión, una "
+        "explicación o una acción, sin dar nada por sentado",
     "no clasificable":
         "no es una intervención de prensa (una cortesía, un saludo), o ni con el "
         "contexto se sabe de qué habla. RARÍSIMO: si entiendes el tema y no hay "
         "carga, eso es neutral, no esto",
 }
 
-_REGLAS = """REGLAS DE DECISIÓN, en orden de prioridad:
+_REGLAS = """LA PREGUNTA QUE DECIDE TODO: **¿la pregunta AFIRMA algo, o solo pide?**
 
-1. LA CARGA ESTÁ EN LA PREMISA, NO EN EL TEMA. Lee lo que la pregunta da por
-   sentado. «¿Hay algún dato de avance sobre la credencialización?» es neutral.
-   «Hay avances importantes, ¿cuál es el mensaje que envía?» es afín al
-   gobierno. Mismo tema, signo distinto, y la diferencia está entera en la
-   premisa.
+Hazte siempre esas dos preguntas, en este orden:
 
-2. PEGARLE A UN RIVAL DEL GOBIERNO ES «AFÍN AL GOBIERNO». No hace falta que lo
-   halague: le sirve igual. «¿Qué tanto daño ha hecho este cártel inmobiliario
-   encabezado por el dirigente del PAN?» da por probado el cargo contra la
-   oposición: afín al gobierno. «¿Cuál es su opinión sobre si el feminismo es
-   compatible con la derecha?» le tiende la mano para que pegue ella: también
-   afín al gobierno.
+  (a) ¿Qué da por sentado esta pregunta? Si no da nada por sentado, es NEUTRAL.
+  (b) Si da algo por sentado: ¿eso que afirma deja mal al gobierno, o lo deja
+      bien a él y mal a un rival suyo?
 
-3. SI HABLA DE UN TERCERO PERO LE RECLAMA AL GOBIERNO, ES CRÍTICA AL GOBIERNO.
-   La prueba: ¿quién queda mal si la pregunta tiene razón? «Esos casos de
-   García Luna están estancados» habla de García Luna y reclama al gobierno
-   actual: crítica al gobierno.
+Este criterio es deliberadamente **textual**. No preguntes «¿a quién le sirve
+esta pregunta?»: casi toda pregunta le da micrófono al gobierno y ese criterio
+no se puede aplicar dos veces igual. Pregunta qué **dice** el texto.
 
-4. LAS PETICIONES SON «AFÍN AL GOBIERNO», salvo que traigan reproche. Pedir
-   algo trata al gobierno como interlocutor benévolo. Pero «llevamos tres años
-   pidiéndolo y nada» es crítica al gobierno: el reproche manda.
+REGLAS DE DECISIÓN, en orden de prioridad:
 
-5. CRÍTICA NO QUIERE DECIR GROSERA. Incorporar una crítica ajena y pedir
-   cuentas por ella —«hay quien percibe que hay prisa, ¿por qué la prisa?»— es
-   crítica al gobierno aunque el tono sea amable.
+1. PEDIR NO ES AFIRMAR. Pedir un dato, una opinión, una explicación o una
+   acción **no afirma nada**: es NEUTRAL. «¿Hay algún dato de avance sobre la
+   credencialización?», «¿podría incluirse educación en empatía animal?»,
+   «¿cuál es su opinión sobre X?» — las tres son neutrales, por más amable que
+   sea el tono y por más que la respuesta pueda lucir al gobierno.
 
-6. «NO CLASIFICABLE» ES RARÍSIMO. Menos de una de cada veinte. Resérvalo para
+   En cambio «Hay avances importantes, ¿cuál es el mensaje que envía?» **sí
+   afirma**: da por hecho que hay avances. Afín al gobierno.
+
+2. **QUE EL TEMA SEA FEO NO VUELVE CRÍTICA A LA PREGUNTA.** Es el error más
+   frecuente y el más caro. Preguntar por un desastre, un homicidio, un
+   desabasto o una crisis **no afirma que el gobierno falló**: afirma que el
+   hecho ocurrió, y eso no es un reproche.
+
+   «¿Cuántos fallecidos hay?», «¿hay algún avance sobre por qué se abrió
+   fuego?», «hay adeudos con la industria farmacéutica, ¿a cuánto ascienden?»
+   son NEUTRALES: piden el dato de una situación mala que nadie discute.
+
+   Para que sea crítica al gobierno, la pregunta tiene que afirmar que **el
+   gobierno** hizo mal, omitió, se contradijo o escondió algo. «¿Por qué no se
+   ha hecho nada?» sí. «¿Qué se está haciendo?» no.
+
+3. AFIRMAR ALGO MALO DE UN RIVAL DEL GOBIERNO ES «AFÍN AL GOBIERNO».
+   «¿Qué tanto daño ha hecho este cártel inmobiliario encabezado por el
+   dirigente del PAN?» da por probado el cargo contra la oposición: afín.
+   Pero «¿cuál es su opinión sobre lo que hizo el PAN?» no afirma nada:
+   neutral.
+
+4. SI AFIRMA ALGO MALO DE UN TERCERO PERO EL RECLAMO ATERRIZA EN EL GOBIERNO,
+   ES CRÍTICA AL GOBIERNO. La prueba: ¿quién queda mal si la pregunta tiene
+   razón? «Esos casos de García Luna están estancados» habla de García Luna y
+   deja mal al gobierno actual: crítica al gobierno.
+
+5. UNA PETICIÓN CON REPROCHE SÍ AFIRMA. «Llevamos tres años pidiéndolo y nada»
+   afirma una omisión: crítica al gobierno. La petición sola, no.
+
+6. CRÍTICA NO QUIERE DECIR GROSERA, Y AFIRMAR NO ES SOLO AFIRMAR EN PRIMERA
+   PERSONA. Incorporar una afirmación ajena cuenta: «hay quien percibe que hay
+   prisa, ¿por qué la prisa?» afirma que hay prisa. Crítica al gobierno aunque
+   el tono sea amable. Igual «se han acercado a nosotros los productores»:
+   afirma que hay un problema.
+
+7. «NO CLASIFICABLE» ES RARÍSIMO. Menos de una de cada veinte. Resérvalo para
    turnos que no son intervención de prensa —«Ok, muchas gracias», «Buenos
    días»— o para fragmentos donde ni con el contexto se sabe de qué se habla.
 

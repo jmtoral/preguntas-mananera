@@ -36,30 +36,56 @@ El caso que parecía excepción lo cubre la regla 3: si le pegas a un tercero pe
 
 **Valores vigentes:** `crítica al gobierno`, `afín al gobierno`, `neutral`, más `no clasificable` que es un hueco declarado.
 
-### El clasificador de postura: de 47% a 57%, y por qué se paró de ajustar
+### LA COMPUERTA DE CONFIABILIDAD DETUVO EL PROYECTO (2026-08-30)
 
-`src/estenograficas/postura.py` y `scripts/clasificar_postura.py`. Tres pasadas perturbadas, checkpoint por `id#pasada`, `Gasto` midiendo el costo real, y el runner **se niega** a correr sobre el corpus si la muestra de oro no está codificada.
+**No correr el corpus. El instrumento produciría el número contrario.**
 
-**El fallo era la regla 6.** El modelo devolvía `no clasificable` 9 veces contra 2 del humano. El diagnóstico de fondo: trataba **«no detecto carga» como «no puedo clasificar»**, cuando la ausencia de carga *es* la definición de `neutral`.
+El humano recodificó los 30 del lote 1 a ciegas, con el libro de códigos final y en otro orden.
 
-La regla nueva dice tres cosas que la vieja no: que `no clasificable` es rarísimo y se reserva para lo que no es intervención de prensa; que **una pregunta corta no es motivo** para usarlo, porque un tercio del corpus son repreguntas de pocas palabras y todas son clasificables con su contexto; y que no hay que confundir no ver carga con no poder clasificar.
+| | acuerdo | kappa |
+|---|---:|---:|
+| humano vs **él mismo** | 57% | **0.35** |
+| humano vs modelo | 60% | 0.45 |
 
-| | v1 (4 valores) | v2 (3 valores) | v3 (regla 6 nueva) |
+**El modelo es más consistente con el humano que el humano consigo mismo.** No se puede validar un instrumento contra un patrón más ruidoso que el instrumento. Es literalmente el caso que anticipa la regla metodológica 3, escrita antes de empezar: *«si no coincide consigo mismo, las categorías están vagas y ningún clasificador lo arregla»*.
+
+**Lo que la compuerta evitó.** Sobre las mismas 30:
+
+| | en contra | a favor | pregunta |
 |---|---:|---:|---:|
-| coincidencia | 47% | 47% | **57%** |
-| `no clasificable` del modelo | 8 | 9 | **3** |
+| humano, 1ª vuelta | 11% | 39% | 50% |
+| humano, 2ª vuelta | 12% | 50% | 38% |
+| **modelo** | **24%** | **17%** | 59% |
 
-Con las dos correcciones que el humano reconoció y no aplicó —P-017 y P-029— llega a **60%**.
+**El modelo invierte la conclusión.** Correr las 21,826 sin esta prueba habría publicado el titular contrario al que sostiene la codificación humana.
 
-**Se paró de ajustar ahí, a propósito.** Con n=30, seguir exprimiendo puntos ajusta ruido aunque el lote 1 esté reservado justamente para esto. 60% crudo sobre cuatro categorías con distribución sesgada implica un alfa de alrededor de **0.45: todavía por debajo de la compuerta de 0.6**.
+**Dónde está roto.** De 39 desacuerdos entre las tres codificaciones, **el 51% cae en la frontera `afín` ↔ `neutral`**. En cambio `crítica al gobierno` es estable: 3 en las dos vueltas del humano. Ese lado del eje sí está bien definido.
 
-**Lo que queda no es un patrón único**, sino cuatro casos donde el humano puso `neutral` y el modelo `afín`. Y al menos uno de ellos —una petición— **el modelo lo resuelve bien según la regla 4**, que se fijó *después* de que el humano codificara el lote 1.
+Y hay una diferencia sistemática que no es ruido: **el modelo marca `crítica al gobierno` en ~24% y el humano en ~11%.** Confunde «la pregunta trata de un problema» con «la pregunta acusa al gobierno».
 
-Comparadas las distribuciones de los dos lotes son casi iguales salvo en `crítica a un tercero` (13% contra 3%), así que el lote 1 sigue sirviendo como conjunto de ajuste — pero no es del todo consistente con el libro de códigos final.
+**Cinco iteraciones, cada una medida** sobre las 17 donde el humano es estable —el único patrón con respuesta bien definida:
 
-**Propuesta para la sesión siguiente: que el humano recodifique los 30 del lote 1 con las reglas finales.** Sirve para dos cosas a la vez — es la medición de consistencia consigo mismo que estaba pendiente, y da un conjunto de ajuste limpio. Después, una iteración más del prompt, y recién entonces el lote 2 para el alfa que se publica.
+| | las 30 | las 17 estables |
+|---|---:|---:|
+| v1 · cuatro valores | 47% | 65% |
+| v2 · tres valores | 47% | 65% |
+| v3 · regla 6 suavizada | 57% | 65% |
+| v4 · criterio textual «¿afirma o pide?» | 60% | 65% |
+| **v5 · + «que el tema sea feo no la vuelve crítica»** | 60% | **71%** |
 
-Corridas archivadas para comparar: `postura_v1_4valores` y `postura_v2_regla6` en `data/checkpoints/` y `data/interim/`.
+El rediseño a un criterio **textual** —¿la pregunta afirma algo, o solo pide?— es mejor que el anterior —¿a quién le sirve?—, que era casi infalsable porque toda pregunta le da micrófono al gobierno.
+
+**Se paró en la v5 a propósito.** Cinco iteraciones sobre 30 preguntas ya es ajustar ruido, aunque el lote 1 esté reservado para eso. Y el problema de fondo no es el prompt: es que **no hay un patrón estable contra el cual medir**.
+
+### Lo que sigue, y es decisión del humano
+
+1. **Codificar más**, para tener un patrón con menos ruido.
+2. **Simplificar las categorías** hasta que su propia consistencia suba. La frontera `afín`/`neutral` es la que hay que replantear; `crítica al gobierno` funciona.
+3. **Publicar solo lo que la codificación humana sostiene por sí sola.** Las 150 son datos reales, codificados a mano y a ciegas; el resultado de 51/36/13 no depende de ningún modelo. Se declara la confiabilidad medida y se dice que el corpus completo queda pendiente.
+
+La tercera es la más honesta si hay prisa: el hallazgo existe, solo que sobre 150 preguntas y no sobre 21,826.
+
+Corridas archivadas: `postura_v1_4valores`, `postura_v2_regla6`, `postura_v3_`, `postura_v4_`. **Los 120 del lote 2 siguen sin tocarse.**
 
 ### Costos, ya medidos y no estimados
 
