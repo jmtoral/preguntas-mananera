@@ -31,6 +31,7 @@ from pathlib import Path
 from estenograficas.checkpoint import Checkpoint
 from estenograficas.config import paths
 from estenograficas.temas_dos_niveles import (
+    Gasto,
     cargar_taxonomia,
     clasificar_paralelo,
     con_contexto,
@@ -48,9 +49,17 @@ CORTA = 200
 CONTEXTO_MAX = 600
 """Tope del contexto. Más que esto y el contexto pesa más que la pregunta."""
 
-# Razones de rechazo que NO son culpa del dato y por tanto se reintentan.
+# Razones de rechazo que se reintentan. Dos familias:
+#  - fallos de infraestructura: no fallaron por el dato.
+#  - fallos por falta de contexto: el modelo dijo «pregunta incompleta» o «no es
+#    una pregunta» porque la recibió suelta. Ahora va con su turno previo, así
+#    que merecen otro intento. Las que sigan sin serlo se rechazan de nuevo con
+#    su razón, que es lo correcto: son turnos como «Ok, muchas gracias».
 REINTENTABLES = ("RESOURCE_EXHAUSTED", "UNAVAILABLE", "DEADLINE_EXCEEDED",
-                 "INTERNAL", "ausente: None", "ServerError", "Timeout")
+                 "INTERNAL", "ausente: None", "ServerError", "Timeout",
+                 "incompleta", "No es una pregunta", "no es una pregunta",
+                 "sin contexto", "no_aplica", "informacion_insuficiente",
+                 "ausente: ''", "preámbulo")
 
 p = paths()
 claves, cats_txt = cargar_taxonomia(p.interim / "taxonomia_temas_candidata.json")
@@ -110,8 +119,8 @@ print(f"POR CLASIFICAR AHORA     : {len(faltan):,}", flush=True)
 chars = sum(len(t) for _, t in faltan)
 tok_in = chars / 3.6 + 3500 * len(faltan) / 10
 tok_out = chars / 3.6 * 0.25 + 40 * len(faltan) / 10
-print(f"costo estimado           : ${tok_in/1e6*0.30 + tok_out/1e6*2.50:.2f} USD",
-      flush=True)
+print(f"costo estimado           : ${tok_in/1e6*0.30 + tok_out/1e6*2.50:.2f} USD "
+      f"(sin pensamiento; se apagó con thinking_budget=0)", flush=True)
 
 if "--dry" in sys.argv:
     print("\n(--dry: no se llamó a la API)")
@@ -122,17 +131,18 @@ vocab = json.loads(vp.read_text(encoding="utf-8")) if vp.exists() else []
 print(f"vocabulario previo       : {len(vocab):,}\n", flush=True)
 
 salida = p.interim / "temas_dos_niveles.jsonl"
+gasto = Gasto()
 n = 0
 t0 = time.time()
 with open(salida, "a", encoding="utf-8") as f:
     for c in clasificar_paralelo(preg, claves, cats_txt, ck, vocab=vocab,
-                                 reintentar=reintentar):
+                                 reintentar=reintentar, gasto=gasto):
         f.write(json.dumps(c.to_dict(), ensure_ascii=False) + "\n")
         n += 1
         if n % 100 == 0:
             f.flush(); vp.write_text(json.dumps(vocab, ensure_ascii=False), encoding="utf-8")
-            print(f"   {n:,} nuevas · {len(vocab):,} asuntos · {time.time()-t0:.0f}s",
-                  flush=True)
+            print(f"   {n:,} nuevas · {len(vocab):,} asuntos · {time.time()-t0:.0f}s"
+                  f" · ${gasto.usd:.2f} gastados", flush=True)
 vp.write_text(json.dumps(vocab, ensure_ascii=False), encoding="utf-8")
 print(f"\nnuevas: {n:,}   hechas: {len(ck.hechos()):,}   "
       f"rechazadas: {len(ck.rechazados()):,}", flush=True)

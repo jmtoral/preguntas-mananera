@@ -63,6 +63,50 @@ un fragmento suelto, el contexto es lo que te dice de qué caso trata.
 Devuelve SOLO JSON:
 {{"clasificacion": {{"<id>": {{"categoria": "", "asunto": ""}}, ...}}}}"""
 
+PRESUPUESTO_PENSAMIENTO = 0
+"""Apaga el razonamiento interno del modelo.
+
+`gemini-2.5-flash` trae *thinking* encendido por omisión y **esos tokens se
+cobran a precio de salida**, que es ocho veces el de entrada. Medido a la mala
+el 2026-08-28: una corrida estimada en $1.08 costó cerca de $5. La estimación
+suponía salida ≈ 25% de la entrada, o sea ningún pensamiento.
+
+Esto es clasificación con esquema fijo y lista cerrada de categorías: no
+necesita cadena de razonamiento. Si algún día una tarea sí la necesita, se sube
+aquí y **se vuelve a medir el costo**, no se supone.
+"""
+
+
+class Gasto:
+    """Acumula el uso real de tokens. Sustituye estimar por medir."""
+
+    # Precios de gemini-2.5-flash, USD por millón. Si cambian, cambian aquí.
+    PRECIO_ENTRADA = 0.30
+    PRECIO_SALIDA = 2.50
+
+    def __init__(self) -> None:
+        self.entrada = self.salida = self.pensamiento = self.llamadas = 0
+
+    def suma(self, uso: Any) -> None:
+        if uso is None:
+            return
+        self.llamadas += 1
+        self.entrada += uso.prompt_token_count or 0
+        self.salida += uso.candidates_token_count or 0
+        self.pensamiento += getattr(uso, "thoughts_token_count", 0) or 0
+
+    @property
+    def usd(self) -> float:
+        # Los tokens de pensamiento se facturan como salida.
+        return (self.entrada / 1e6 * self.PRECIO_ENTRADA
+                + (self.salida + self.pensamiento) / 1e6 * self.PRECIO_SALIDA)
+
+    def resumen(self) -> str:
+        return (f"{self.llamadas:,} llamadas · entrada {self.entrada:,} · "
+                f"salida {self.salida:,} · pensamiento {self.pensamiento:,} · "
+                f"**${self.usd:.2f} USD reales**")
+
+
 MARCA_PREGUNTA = "PREGUNTA:"
 """Separa el contexto de la pregunta dentro de una entrada del lote.
 
@@ -157,6 +201,9 @@ def clasificar(
                         system_instruction=_INSTRUCCION.format(cats=cats_txt, vocab=vt),
                         temperature=TEMPERATURA,
                         response_mime_type="application/json",
+                        thinking_config=types.ThinkingConfig(
+                            thinking_budget=PRESUPUESTO_PENSAMIENTO
+                        ),
                     ),
                 )
                 datos = json.loads(r.text).get("clasificacion", {})
@@ -339,6 +386,7 @@ def clasificar_paralelo(
     lote: int = LOTE,
     trabajadores: int = TRABAJADORES,
     reintentar: set[str] | None = None,
+    gasto: "Gasto | None" = None,
 ) -> Iterator[Clasificacion]:
     """Igual que `clasificar` pero con varias peticiones a la vez.
 
@@ -381,8 +429,14 @@ def clasificar_paralelo(
                         system_instruction=_INSTRUCCION.format(cats=cats_txt, vocab=vt),
                         temperature=TEMPERATURA,
                         response_mime_type="application/json",
+                        thinking_config=types.ThinkingConfig(
+                            thinking_budget=PRESUPUESTO_PENSAMIENTO
+                        ),
                     ),
                 )
+                if gasto is not None:
+                    with candado:
+                        gasto.suma(getattr(r, "usage_metadata", None))
                 return trozo, json.loads(r.text).get("clasificacion", {}), ""
             except Exception as e:  # noqa: BLE001
                 error = f"{type(e).__name__}: {e}"
