@@ -6,48 +6,57 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ---
 
-## Plan al 2026-08-28 (segunda versión, la primera era demasiado)
+## Estado al 2026-08-30, de madrugada
 
-El humano leyó la primera versión y dijo: **«este plan está demencial y no avanza»**. Tenía razón. Seis frentes en paralelo, una semana de calendario, y el número que le interesa sin moverse. Esta versión es lo mínimo para llegar al número.
+### LAS 150 ESTÁN CODIFICADAS. Y el resultado ya existe
 
-### Lo que quiere saber, dicho por él
+El humano terminó la muestra de oro completa. Sobre 135 clasificables (15 fueron `no clasificable`):
 
-> «Me interesa clasificar las que están **en favor** y las que están **en contra** del gobierno. Las críticas a terceros suelen ser a favor del gobierno, y **lo neutral es lo que realmente pregunta**.»
+| cubeta | n | % | IC 95% |
+|---|---:|---:|---:|
+| lo que realmente pregunta | 69 | 51.1% | 43–59% |
+| **a favor del gobierno** | 49 | **36.3%** | 29–45% |
+| **en contra del gobierno** | 17 | **12.6%** | 8–19% |
 
-**Eso no obliga a recodificar nada.** Las cuatro categorías que se están codificando son el esquema de **codificación**; sus tres cubetas son el esquema de **reporte**. Se colapsan así:
+**Casi tres a favor por cada una en contra, y los intervalos no se tocan.** Es una estimación del corpus a partir de una muestra aleatoria codificada a ciegas: el hallazgo ya está, antes de que el modelo corriera. Lo que falta es escalarlo y desagregarlo por periodista y medio.
 
-| se codifica | se reporta |
-|---|---|
-| `crítica al gobierno` | **en contra** |
-| `afín al gobierno` + `crítica a un tercero` | **a favor** |
-| `neutral` | **lo que realmente pregunta** |
+Dos pendientes que no mueven la conclusión pero hay que cerrar antes de publicar: **P-017 y P-029 quedaron en `crítica a un tercero`** cuando el humano dijo que eran deslices y van a `crítica al gobierno` (subiría «en contra» a 19), y **las peticiones cuentan en «a favor»**, que hay que revisar con la columna de fragmentos.
 
-Codificar fino y reportar grueso es lo correcto: se puede colapsar después, no se puede desagregar. Y deja abierto separar halago de golpe-al-rival si algún día interesa.
+### El clasificador de postura existe y la primera prueba salió mal
 
-**Un pendiente honesto de esta decisión:** en el lote 1 se acordó mandar las **peticiones** a `afín al gobierno`, así que caen en «a favor». Pero una petición a nombre de los productores o de los padres de familia se parece más a «lo que realmente pregunta» que a un halago. **Hay que revisarlo antes de reportar**, y se puede revisar sin recodificar porque el humano dejó fragmento en cada fila.
+`src/estenograficas/postura.py` y `scripts/clasificar_postura.py`. Una dimensión, cuatro valores, tres pasadas perturbadas —orden de las categorías y posición del bloque de contexto—, con `Gasto` midiendo el costo real.
 
-### La ruta, tres pasos
+**Probado sobre los 30 del lote 1: 47% de coincidencia con el humano.** Muy por debajo de lo aceptable. Tres patrones, todos del prompt y no del dato:
 
-**El único bloqueo real es dinero.** Los créditos de Gemini están agotados desde el 2026-08-28; sin recargar no corre nada.
+1. **`crítica a un tercero` no se disparó ni una vez** (0 del modelo contra 4 del humano). La categoría existe en el prompt pero el modelo no la alcanza. Es la más importante del esquema: sin ella, todo lo que le pega a la oposición cae en neutral o en crítica al gobierno.
+2. **Se raja de más:** 8 `no clasificable` contra 2 del humano, todos en fragmentos cortos que el humano sí resolvió con el contexto. La instrucción de «no adivines» quedó demasiado fuerte.
+3. **Confunde `neutral` con `afín`** en preguntas que invitan a lucirse sin afirmar nada (P-024, P-087, P-108, P-132). La regla de la premisa está escrita pero no discrimina bien en ese borde.
 
-1. **El humano termina las 150.** Faltan 5 arreglos del lote 1 y los 120 del lote 2.
-2. **El agente escribe el prompt de postura y corre el corpus.** Una sola dimensión, cuatro valores, tres pasadas perturbadas. **~$5.** Cerrar la clasificación temática pendiente son **~$3** más.
-3. **Se reporta en las tres cubetas**, con el alfa contra las 150 al lado.
+Dato a favor del modelo: en **P-017** dijo `crítica al gobierno`, que es el valor **corregido** del humano, no el que quedó en la hoja.
 
-### Lo que NO detiene el número, y va después
+**Iterar el prompt con estos 30 es legítimo y los 120 se quedan intactos.** Ésa fue la razón de partir la muestra: la selección de modelo y el ajuste del prompt se hacen sobre el lote 1, el alfa que se reporta sale del lote 2. Ajustar contra las 150 completas sí sería entrenar contra la validación.
 
-Todo esto es control de calidad o mejora, y ninguno bloquea el paso 3:
+### Costos, ya medidos y no estimados
 
-- Alfa intra-codificador (recodificar 20 a las 72 h). Sirve para saber si un alfa bajo es culpa del modelo o de las categorías. Si el alfa humano-modelo sale bien, es casi trámite.
-- Los 7 hilos contaminados y el patrón `Nombre, servidor,`. Renumeran ids: van al final, re-enlazando la muestra por texto.
-- Canonizar los ~620 nombres de medio. Afecta los conteos **por medio**, no los conteos totales ni los de periodista.
-- Respaldar `data/raw/`.
+Con `thinking_budget=0` la estimación cuadra: la prueba estimó $0.01 y costó $0.01, con `pensamiento: 0` confirmado en `usage_metadata`.
 
-### Lo que sigue sin negociarse
+| | estimado |
+|---|---:|
+| corpus completo, 3 pasadas | **$11.39** |
+| corpus completo, 1 pasada | ~$3.80 |
 
-- **Las 150 se codifican antes de correr el modelo sobre el corpus.** Está casi cumplido; no adelantarlo por prisa.
-- **Si el alfa sale bajo se rediseñan las categorías, no el prompt.**
-- **No se abre el archivo de valoraciones externas** hasta tener resultados propios.
+El humano ha estado con presupuesto muy corto. **Avisar siempre antes de gastar y correr `--dry` primero.**
+
+### Lo que sigue, en orden
+
+1. **Arreglar el prompt de postura** contra los 30 del lote 1. Los tres patrones de arriba son concretos y accionables. Iterar hasta que la coincidencia suba; **no tocar los 120**.
+2. **Correr sobre las 150** y calcular el alfa de Krippendorff contra el lote 2, partido en fragmentos y sustantivas.
+3. Si el alfa pasa, **corpus completo**. Si no pasa, **se rediseñan las categorías, no el prompt**.
+4. Reportar en las tres cubetas.
+
+### Lo que NO bloquea el número
+
+Alfa intra-codificador a las 72 h · los 7 hilos contaminados (renumeran ids: van al final, re-enlazando la muestra por texto) · canonizar los ~620 medios · respaldar `data/raw/`.
 
 ---
 
