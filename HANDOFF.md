@@ -36,28 +36,30 @@ El caso que parecía excepción lo cubre la regla 3: si le pegas a un tercero pe
 
 **Valores vigentes:** `crítica al gobierno`, `afín al gobierno`, `neutral`, más `no clasificable` que es un hueco declarado.
 
-### El clasificador de postura existe, y falla por una sola cosa
+### El clasificador de postura: de 47% a 57%, y por qué se paró de ajustar
 
-`src/estenograficas/postura.py` y `scripts/clasificar_postura.py`. Tres pasadas perturbadas —orden de las categorías y posición del bloque de contexto—, checkpoint por `id#pasada`, `Gasto` midiendo el costo real. El runner **se niega** a correr sobre el corpus si la muestra de oro no está codificada.
+`src/estenograficas/postura.py` y `scripts/clasificar_postura.py`. Tres pasadas perturbadas, checkpoint por `id#pasada`, `Gasto` midiendo el costo real, y el runner **se niega** a correr sobre el corpus si la muestra de oro no está codificada.
 
-**Probado dos veces sobre los 30 del lote 1: 47% de coincidencia con cuatro valores y 47% con tres.** La fusión no movió la aguja porque el problema estaba en otro lado, y ahora que está aislado se ve solo:
+**El fallo era la regla 6.** El modelo devolvía `no clasificable` 9 veces contra 2 del humano. El diagnóstico de fondo: trataba **«no detecto carga» como «no puedo clasificar»**, cuando la ausencia de carga *es* la definición de `neutral`.
 
-| valor | humano | modelo |
-|---|---:|---:|
-| crítica al gobierno | 3 | 6 |
-| afín al gobierno | 11 | 7 |
-| neutral | 14 | 8 |
-| **no clasificable** | **2** | **9** |
+La regla nueva dice tres cosas que la vieja no: que `no clasificable` es rarísimo y se reserva para lo que no es intervención de prensa; que **una pregunta corta no es motivo** para usarlo, porque un tercio del corpus son repreguntas de pocas palabras y todas son clasificables con su contexto; y que no hay que confundir no ver carga con no poder clasificar.
 
-**El modelo se raja: 9 `no clasificable` contra 2 del humano, y eso explica 7 de los 16 desacuerdos.** La regla 6 del prompt —«si es un fragmento que ni con el contexto se entiende, no adivines»— quedó demasiado fuerte. El humano sí resolvió esos fragmentos usando el contexto; el modelo se rinde antes.
+| | v1 (4 valores) | v2 (3 valores) | v3 (regla 6 nueva) |
+|---|---:|---:|---:|
+| coincidencia | 47% | 47% | **57%** |
+| `no clasificable` del modelo | 8 | 9 | **3** |
 
-**Ése es el arreglo siguiente, y es uno solo.** Suavizar la regla 6: reservar `no clasificable` para lo que de verdad no es una pregunta —«Ok, muchas gracias»— y exigir que use el contexto antes de rendirse. Si eso sube la coincidencia a ~70%, el resto son bordes finos.
+Con las dos correcciones que el humano reconoció y no aplicó —P-017 y P-029— llega a **60%**.
 
-Dato importante: en **P-017 y P-029 el modelo coincide con el juicio CORREGIDO del humano**, no con el que quedó escrito en la hoja. El humano reconoció esos dos como deslices y nunca aplicó la corrección. Si se aplican, la coincidencia sube sola.
+**Se paró de ajustar ahí, a propósito.** Con n=30, seguir exprimiendo puntos ajusta ruido aunque el lote 1 esté reservado justamente para esto. 60% crudo sobre cuatro categorías con distribución sesgada implica un alfa de alrededor de **0.45: todavía por debajo de la compuerta de 0.6**.
 
-**Iterar el prompt con estos 30 es legítimo; los 120 del lote 2 siguen sin tocarse.** Ésa fue la razón de partir la muestra: el prompt se ajusta con el lote 1, el alfa que se publica sale del lote 2.
+**Lo que queda no es un patrón único**, sino cuatro casos donde el humano puso `neutral` y el modelo `afín`. Y al menos uno de ellos —una petición— **el modelo lo resuelve bien según la regla 4**, que se fijó *después* de que el humano codificara el lote 1.
 
-Las corridas con el prompt de cuatro valores quedaron archivadas como `postura_v1_4valores.*` en `data/checkpoints/` y `data/interim/`, por si hay que comparar.
+Comparadas las distribuciones de los dos lotes son casi iguales salvo en `crítica a un tercero` (13% contra 3%), así que el lote 1 sigue sirviendo como conjunto de ajuste — pero no es del todo consistente con el libro de códigos final.
+
+**Propuesta para la sesión siguiente: que el humano recodifique los 30 del lote 1 con las reglas finales.** Sirve para dos cosas a la vez — es la medición de consistencia consigo mismo que estaba pendiente, y da un conjunto de ajuste limpio. Después, una iteración más del prompt, y recién entonces el lote 2 para el alfa que se publica.
+
+Corridas archivadas para comparar: `postura_v1_4valores` y `postura_v2_regla6` en `data/checkpoints/` y `data/interim/`.
 
 ### Costos, ya medidos y no estimados
 

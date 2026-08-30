@@ -22,26 +22,19 @@ Lo que falta es escalarlo a las 21,826 y desagregarlo por periodista y medio.
 
 ## Tu tarea, en este orden
 
-**1. Arreglar el prompt de postura.** El problema está aislado y es uno solo:
+**1. Recodificar yo los 30 del lote 1 con las reglas finales.** Los codifiqué antes de que las reglas quedaran fijas, así que no son consistentes con el libro de códigos actual. Pídemelos y los hago: sirve además como la medición de mi consistencia conmigo mismo, que estaba pendiente.
 
-| valor | yo | modelo |
-|---|---:|---:|
-| crítica al gobierno | 3 | 6 |
-| afín al gobierno | 11 | 7 |
-| neutral | 14 | 8 |
-| **no clasificable** | **2** | **9** |
+**2. Seguir arreglando el prompt de postura.** Va en **57%** de coincidencia conmigo (60% aplicando dos correcciones mías). Ya se arregló lo grande: el modelo devolvía `no clasificable` 9 veces contra mis 2 y ahora son 3. Lo que queda son cuatro casos donde yo puse `neutral` y el modelo `afín al gobierno` — y de ésos, al menos uno el modelo lo tiene bien y yo mal.
 
-**El modelo se raja.** Nueve `no clasificable` contra mis dos, y eso solo explica 7 de los 16 desacuerdos. La regla 6 del prompt quedó demasiado fuerte: yo sí resolví esos fragmentos usando el contexto, el modelo se rinde antes. Suavízala —`no clasificable` solo para lo que de verdad no es pregunta, tipo «Ok, muchas gracias»— y vuelve a medir.
-
-Ojo: en P-017 y P-029 el modelo coincide con mi juicio **corregido**, no con lo que quedó en la hoja. Reconocí esos dos como deslices y no apliqué la corrección.
+**No sigas ajustando sin que yo recodifique primero.** Con 30 preguntas, exprimir puntos es ajustar ruido.
 
 **Ajusta contra los 30 del lote 1 y NO toques los 120 del lote 2.** Ésa es la razón de haber partido la muestra: el prompt se ajusta con el lote 1, el alfa que voy a publicar sale del lote 2. Tocar los 120 sería entrenar contra la validación.
 
-**2. Correr sobre las 150 y calcular el alfa de Krippendorff** contra el lote 2, partido en dos: fragmentos cortos y preguntas sustantivas. Un tercio del corpus son fragmentos de menos de 80 caracteres y no se comportan igual.
+**3. Correr sobre las 150 y calcular el alfa de Krippendorff** contra el lote 2, partido en dos: fragmentos cortos y preguntas sustantivas. Un tercio del corpus son fragmentos de menos de 80 caracteres y no se comportan igual.
 
-**3. Si el alfa pasa de 0.6, correr el corpus completo.** Si no pasa, **se rediseñan las categorías, no el prompt.**
+**4. Si el alfa pasa de 0.6, correr el corpus completo.** Si no pasa, **se rediseñan las categorías, no el prompt.**
 
-**4. Reportar** en tres cubetas: **en contra** / **a favor** / **lo que realmente pregunta**.
+**5. Reportar** en tres cubetas: **en contra** / **a favor** / **lo que realmente pregunta**.
 
 ## Cómo quiero que trabajes
 

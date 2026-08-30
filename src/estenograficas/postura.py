@@ -78,7 +78,9 @@ _DEFINICIONES = {
     "neutral":
         "pide un dato o una explicación sin carga en ninguna dirección",
     "no clasificable":
-        "no es una pregunta, o es un fragmento que ni con su contexto se entiende",
+        "no es una intervención de prensa (una cortesía, un saludo), o ni con el "
+        "contexto se sabe de qué habla. RARÍSIMO: si entiendes el tema y no hay "
+        "carga, eso es neutral, no esto",
 }
 
 _REGLAS = """REGLAS DE DECISIÓN, en orden de prioridad:
@@ -109,8 +111,19 @@ _REGLAS = """REGLAS DE DECISIÓN, en orden de prioridad:
    cuentas por ella —«hay quien percibe que hay prisa, ¿por qué la prisa?»— es
    crítica al gobierno aunque el tono sea amable.
 
-6. SI NO ES UNA PREGUNTA, o es un fragmento que ni con el contexto se entiende,
-   es «no clasificable». No adivines."""
+6. «NO CLASIFICABLE» ES RARÍSIMO. Menos de una de cada veinte. Resérvalo para
+   turnos que no son intervención de prensa —«Ok, muchas gracias», «Buenos
+   días»— o para fragmentos donde ni con el contexto se sabe de qué se habla.
+
+   **No lo uses porque la pregunta sea corta.** Un tercio de este corpus son
+   repreguntas de pocas palabras —«¿Podrían ser virtuales las clases?», «¿Y de
+   ser necesario, que asistan a declarar?»— y todas son clasificables: el
+   contexto dice de qué tratan y la pregunta dice con qué carga.
+
+   **Y sobre todo: no confundas «no le veo carga» con «no puedo clasificar».**
+   Que una pregunta no empuje hacia ningún lado no es un hueco, es exactamente
+   la definición de «neutral». Si entiendes de qué habla y no carga contra
+   nadie ni le sirve a nadie, es NEUTRAL, no «no clasificable»."""
 
 _INSTRUCCION = """Eres un asistente de investigación en análisis de contenido.
 Clasificas la POSTURA de preguntas de prensa de las conferencias matutinas de
