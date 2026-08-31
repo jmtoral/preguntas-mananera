@@ -80,9 +80,12 @@ aquí y **se vuelve a medir el costo**, no se supone.
 class Gasto:
     """Acumula el uso real de tokens. Sustituye estimar por medir."""
 
-    # Precios de gemini-2.5-flash, USD por millón. Si cambian, cambian aquí.
-    PRECIO_ENTRADA = 0.30
-    PRECIO_SALIDA = 2.50
+    # Precios de lista de gemini-2.5-flash, USD por millón, verificados el
+    # 2026-08-30. Estaban al doble y hay que revisarlos si Google los mueve:
+    # el contador es exacto en tokens, no en dinero, y el error se propaga a
+    # cada estimación que el humano usa para decidir si gasta.
+    PRECIO_ENTRADA = 0.15
+    PRECIO_SALIDA = 1.25
 
     def __init__(self) -> None:
         self.entrada = self.salida = self.pensamiento = self.llamadas = 0

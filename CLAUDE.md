@@ -136,6 +136,14 @@ Fusionarla **no cambió ningún resultado**: los dos valores ya caían en la mis
 
 4. **Se reporta alfa de Krippendorff** entre la codificación humana y la del modelo. Debajo de 0.6 el libro de códigos está mal definido y se rediseña. **No se ajusta el prompt hasta que el número suba: eso es entrenar contra la validación.**
 
+   **La compuerta se aplicó el 2026-08-30 y REPROBÓ.** Contra los 120 del lote 2 —nunca usados para ajustar— el acuerdo fue **57%, kappa 0.34**. Contra los 30 del lote 1, donde el prompt se iteró cinco veces, **59%, kappa 0.36**: prácticamente igual, o sea que ajustar el prompt no compró nada.
+
+   **El fallo está en una sola categoría.** De lo que el humano marcó `afín al gobierno`, el modelo acierta el **19%** y manda el 56% a `neutral`. En cambio detecta `neutral` al 83% y `crítica al gobierno` al 59%.
+
+   **La conclusión, y es sobre el constructo, no sobre el modelo:** «afín al gobierno», tal como lo aplica el humano, **no es operacionalizable desde el texto**. Incluye peticiones, plataformas e invitaciones a lucirse, y esa afinidad vive en la función de la pregunta dentro del salón, no en sus palabras. El propio humano solo coincide consigo mismo en 57% (kappa 0.35): no es que el modelo no entienda la regla, es que la regla no está escrita en ningún lado.
+
+   **Lo que sí quedó demostrado que funciona:** distinguir preguntas con carga de preguntas sin ella. `neutral` se detecta al 83%. Eso permite usar el modelo como **filtro** —reducir 21,826 a las ~5,500 con carga— y codificar a mano una muestra de ésas, en vez de pedirle que decida la dirección.
+
 5. **Tres corridas por pregunta, temperatura baja, con perturbación entre corridas.** Las que no coinciden entre corridas son ambiguas y van a revisión, no se resuelven por mayoría en silencio. **La temperatura baja sola no mide nada:** tres corridas idénticas coinciden por construcción y la "consistencia" sale alta sin significar nada. Las corridas se diferencian por algo sustantivo —orden de las categorías en el prompt, orden de los turnos de contexto— para que el desacuerdo signifique fragilidad real de la clasificación y no ruido de muestreo.
 
 6. **El segundo clasificador es embeddings más regresión logística regularizada, no un fine-tune.** Con 150 ejemplos etiquetados un transformer afinado sobreajusta. La regresión además es interpretable. Si algún día hay 2000 ejemplos codificados, se reconsidera.

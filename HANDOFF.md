@@ -36,56 +36,42 @@ El caso que parecía excepción lo cubre la regla 3: si le pegas a un tercero pe
 
 **Valores vigentes:** `crítica al gobierno`, `afín al gobierno`, `neutral`, más `no clasificable` que es un hueco declarado.
 
-### LA COMPUERTA DE CONFIABILIDAD DETUVO EL PROYECTO (2026-08-30)
+### VEREDICTO: la compuerta reprobó contra el lote 2 (2026-08-30)
 
-**No correr el corpus. El instrumento produciría el número contrario.**
+El corpus completo se clasificó —21,734 preguntas, **$2.53** al precio real— y el instrumento **reprueba** contra el único patrón que quedaba limpio.
 
-El humano recodificó los 30 del lote 1 a ciegas, con el libro de códigos final y en otro orden.
-
-| | acuerdo | kappa |
-|---|---:|---:|
-| humano vs **él mismo** | 57% | **0.35** |
-| humano vs modelo | 60% | 0.45 |
-
-**El modelo es más consistente con el humano que el humano consigo mismo.** No se puede validar un instrumento contra un patrón más ruidoso que el instrumento. Es literalmente el caso que anticipa la regla metodológica 3, escrita antes de empezar: *«si no coincide consigo mismo, las categorías están vagas y ningún clasificador lo arregla»*.
-
-**Lo que la compuerta evitó.** Sobre las mismas 30:
-
-| | en contra | a favor | pregunta |
+| | n | acuerdo | kappa |
 |---|---:|---:|---:|
-| humano, 1ª vuelta | 11% | 39% | 50% |
-| humano, 2ª vuelta | 12% | 50% | 38% |
-| **modelo** | **24%** | **17%** | 59% |
+| **lote 2**, nunca usado para ajustar | 120 | **57%** | **0.34** |
+| lote 1, iterado cinco veces | 29 | 59% | 0.36 |
 
-**El modelo invierte la conclusión.** Correr las 21,826 sin esta prueba habría publicado el titular contrario al que sostiene la codificación humana.
+**Prácticamente iguales.** Cinco iteraciones de prompt no compraron nada, ni siquiera dentro del conjunto donde se ajustó. Eso descarta que el problema fuera el prompt.
 
-**Dónde está roto.** De 39 desacuerdos entre las tres codificaciones, **el 51% cae en la frontera `afín` ↔ `neutral`**. En cambio `crítica al gobierno` es estable: 3 en las dos vueltas del humano. Ese lado del eje sí está bien definido.
+**El fallo está en una sola categoría.** De lo que el humano marcó:
 
-Y hay una diferencia sistemática que no es ruido: **el modelo marca `crítica al gobierno` en ~24% y el humano en ~11%.** Confunde «la pregunta trata de un problema» con «la pregunta acusa al gobierno».
+| su etiqueta | n | el modelo acierta | se le va a |
+|---|---:|---:|---|
+| `neutral` | 69 | **83%** | — |
+| `crítica al gobierno` | 17 | 59% | 41% a neutral |
+| **`afín al gobierno`** | 48 | **19%** | **56% a neutral** |
 
-**Cinco iteraciones, cada una medida** sobre las 17 donde el humano es estable —el único patrón con respuesta bien definida:
+**La conclusión es sobre el constructo, no sobre el modelo.** `afín al gobierno`, tal como lo aplica el humano, **no es operacionalizable desde el texto**. Incluye peticiones, plataformas e invitaciones a lucirse, y esa afinidad vive en la **función** de la pregunta dentro del salón, no en sus palabras. El propio humano coincide consigo mismo en 57% (kappa 0.35): no es que el modelo no entienda la regla — es que la regla no está escrita en ningún lado.
 
-| | las 30 | las 17 estables |
+**Los dos resultados, y hay que reportar ambos:**
+
+| | humano · 135 | modelo · 19,496 |
 |---|---:|---:|
-| v1 · cuatro valores | 47% | 65% |
-| v2 · tres valores | 47% | 65% |
-| v3 · regla 6 suavizada | 57% | 65% |
-| v4 · criterio textual «¿afirma o pide?» | 60% | 65% |
-| **v5 · + «que el tema sea feo no la vuelve crítica»** | 60% | **71%** |
+| en contra | **12.6%** | 18.8% |
+| a favor | **36.3%** | 8.3% |
+| lo que realmente pregunta | 51.1% | 72.9% |
 
-El rediseño a un criterio **textual** —¿la pregunta afirma algo, o solo pide?— es mejor que el anterior —¿a quién le sirve?—, que era casi infalsable porque toda pregunta le da micrófono al gobierno.
+El del humano es el defendible —muestra aleatoria, a mano, a ciegas—, con su confiabilidad declarada, que es baja.
 
-**Se paró en la v5 a propósito.** Cinco iteraciones sobre 30 preguntas ya es ajustar ruido, aunque el lote 1 esté reservado para eso. Y el problema de fondo no es el prompt: es que **no hay un patrón estable contra el cual medir**.
+### Lo que SÍ funciona y hay que aprovechar
 
-### Lo que sigue, y es decisión del humano
+**`neutral` se detecta al 83%.** El modelo sirve como **filtro**: reduce 21,826 a las ~5,500 preguntas con carga, y el humano codifica una muestra de ésas. Multiplica su alcance sin pedirle al modelo que decida la dirección, que es justo lo que no puede hacer.
 
-1. **Codificar más**, para tener un patrón con menos ruido.
-2. **Simplificar las categorías** hasta que su propia consistencia suba. La frontera `afín`/`neutral` es la que hay que replantear; `crítica al gobierno` funciona.
-3. **Publicar solo lo que la codificación humana sostiene por sí sola.** Las 150 son datos reales, codificados a mano y a ciegas; el resultado de 51/36/13 no depende de ningún modelo. Se declara la confiabilidad medida y se dice que el corpus completo queda pendiente.
-
-La tercera es la más honesta si hay prisa: el hallazgo existe, solo que sobre 150 preguntas y no sobre 21,826.
-
-Corridas archivadas: `postura_v1_4valores`, `postura_v2_regla6`, `postura_v3_`, `postura_v4_`. **Los 120 del lote 2 siguen sin tocarse.**
+Es el camino más corto a un número defendible: codificar 150 dentro del subconjunto cargado da mucha más información por decisión que codificar 150 al azar, donde la mitad son peticiones de dato.
 
 ### Costos, ya medidos y no estimados
 

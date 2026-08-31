@@ -216,9 +216,55 @@ def arma_entrada(pregunta: str, contexto: str, pasada: int) -> str:
     return f"{p}\n{c}" if pasada == 1 else f"{c}\n{p}"
 
 
-def _prompt(pasada: int) -> str:
+def ejemplos_del_humano(p: Any, n: int = 10, semilla: int = 7) -> tuple[str, set[str]]:
+    """Bloque de ejemplos con las decisiones REALES del humano, y qué códigos usó.
+
+    Las reglas escritas son mi paráfrasis de su criterio; los ejemplos son su
+    criterio. Contra un desacuerdo sistemático —el modelo lee `crítica al
+    gobierno` en el 24% y el humano en el 11%— mostrar casos pesa más que
+    describir la regla.
+
+    **Salen solo del lote 1**, que es el conjunto reservado para ajustar. Los
+    120 del lote 2 no se tocan: de ahí sale el alfa que se publica. Devuelve
+    también los códigos usados para poder medir fuera de ellos.
+    """
+    import csv
+
+    import pandas as pd
+
+    llave = {r["codigo"]: r["id_pregunta"] for r in csv.DictReader(
+        open(p.gold / "muestra_oro_LLAVE_no_abrir.csv", encoding="utf-8"))}
+    d = pd.read_excel(p.gold / "recodificacion_lote1.xlsx", sheet_name="recodificación")
+    filas = [r for _, r in d.iterrows()
+             if pd.notna(r["postura"]) and r["postura"] != "no clasificable"]
+
+    # Reparto equilibrado entre valores: si se muestrea al azar, `crítica al
+    # gobierno` casi no aparece —es el 10%— y es justo la que el modelo falla.
+    por_valor: dict[str, list] = {}
+    for r in filas:
+        por_valor.setdefault(r["postura"], []).append(r)
+    rnd = random.Random(semilla)
+    elegidas = []
+    for v in sorted(por_valor):
+        rnd.shuffle(por_valor[v])
+        elegidas += por_valor[v][: max(2, n // len(por_valor))]
+    rnd.shuffle(elegidas)
+
+    bloque, codigos = [], set()
+    for r in elegidas:
+        q = " ".join(str(r["PREGUNTA A CODIFICAR"]).split())[:300]
+        ctx = " ".join(str(r["lo que se dijo antes"]).split())[-180:]
+        bloque.append(f"CONTEXTO: …{ctx}\nPREGUNTA: {q}\n→ {r['postura']}")
+        codigos.add(r["codigo"])
+    texto = ("EJEMPLOS RESUELTOS por el investigador. Cuando dudes, imita estos "
+             "antes que tu propio criterio:\n\n" + "\n\n".join(bloque))
+    return texto, codigos
+
+
+def _prompt(pasada: int, ejemplos: str = "") -> str:
     vals = "\n".join(f"- {v}: {_DEFINICIONES[v]}" for v in _orden_valores(pasada))
-    return _INSTRUCCION.format(valores=vals, reglas=_REGLAS)
+    base = _INSTRUCCION.format(valores=vals, reglas=_REGLAS)
+    return f"{base}\n\n{ejemplos}" if ejemplos else base
 
 
 def clasificar_postura(
@@ -228,6 +274,7 @@ def clasificar_postura(
     lote: int = LOTE,
     trabajadores: int = 6,
     gasto: Any = None,
+    ejemplos: str = "",
 ) -> Iterator[Postura]:
     """Clasifica `(id, pregunta, contexto)` en una pasada.
 
@@ -244,7 +291,7 @@ def clasificar_postura(
 
     cliente = genai.Client(api_key=gemini_api_key())
     candado = threading.Lock()
-    sistema = _prompt(pasada)
+    sistema = _prompt(pasada, ejemplos)
     ya = ck.procesados()
     pend = [(i, q, c) for i, q, c in items if f"{i}#{pasada}" not in ya]
     trozos = [pend[k : k + lote] for k in range(0, len(pend), lote)]

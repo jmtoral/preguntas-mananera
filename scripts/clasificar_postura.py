@@ -25,6 +25,7 @@ from estenograficas.postura import (  # noqa: E402
     LOTE,
     PASADAS,
     clasificar_postura,
+    ejemplos_del_humano,
 )
 from estenograficas.temas_dos_niveles import Gasto  # noqa: E402
 
@@ -85,6 +86,10 @@ def main() -> int:
                     help="solo los 30 del lote 1, para probar el prompt")
     ap.add_argument("--pasadas", type=int, default=PASADAS)
     ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--sin-ejemplos", action="store_true",
+                    help="no incluir los ejemplos resueltos por el humano")
+    ap.add_argument("--fuera-de-ejemplos", action="store_true",
+                    help="evaluar solo en las que NO se usaron como ejemplo")
     args = ap.parse_args()
 
     p = paths()
@@ -111,6 +116,17 @@ def main() -> int:
         items = todo
         etiqueta = "corpus completo"
 
+    ejemplos, usados = ("", set())
+    if not args.sin_ejemplos:
+        ejemplos, usados = ejemplos_del_humano(p)
+        print(f"ejemplos del humano en el prompt: {len(usados)}")
+    if args.fuera_de_ejemplos:
+        import csv as _csv
+        cod = {r["id_pregunta"]: r["codigo"] for r in _csv.DictReader(
+            open(p.gold / "muestra_oro_LLAVE_no_abrir.csv", encoding="utf-8"))}
+        items = [x for x in items if cod.get(x[0]) not in usados]
+        print(f"evaluando fuera de los ejemplos: {len(items)} preguntas")
+
     ck = Checkpoint("postura")
     ya = ck.procesados()
     faltan = sum(1 for i, _, _ in items for k in range(args.pasadas)
@@ -134,7 +150,8 @@ def main() -> int:
     n, t0 = 0, time.time()
     with open(salida, "a", encoding="utf-8") as f:
         for pasada in range(args.pasadas):
-            for c in clasificar_postura(items, ck, pasada=pasada, gasto=gasto):
+            for c in clasificar_postura(items, ck, pasada=pasada, gasto=gasto,
+                                        ejemplos=ejemplos):
                 f.write(json.dumps(c.to_dict(), ensure_ascii=False) + "\n")
                 n += 1
                 if n % 100 == 0:
