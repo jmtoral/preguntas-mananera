@@ -36,6 +36,56 @@ El caso que parecía excepción lo cubre la regla 3: si le pegas a un tercero pe
 
 **Valores vigentes:** `crítica al gobierno`, `afín al gobierno`, `neutral`, más `no clasificable` que es un hueco declarado.
 
+### Capa de reglas por mandato del humano (2026-08-30)
+
+Después del veredicto, el humano ordenó clasificar por reglas, reconociendo que no es científico:
+
+> «Todas las tandas que digan explícitamente "prian", "prianismo" etc. son a favor; todo lo que diga "oposición" es a favor; todo lo que diga neoliberal, viejo régimen, es afín. Todo lo que venga de los reporteros identificados como adherentes al régimen es afín. **No es científica esa clasificación, pero es correcta.** Te mandato a que clasifiques de esa forma.»
+
+Después agregó: los expresidentes —Calderón, Peña Nieto, Fox, Zedillo, Salinas— también.
+
+Implementado en `scripts/postura_por_reglas.py` **como capa aparte**: cada pregunta conserva su etiqueta del modelo, recibe la de la regla, y se registra cuál disparó. Salida en `data/outputs/postura_final.jsonl`. Revertir no cuesta nada; hay banderas `--sin-oposicion` y `--sin-periodistas`.
+
+**Alcance medido antes de aplicar:**
+
+| regla | preguntas | del corpus |
+|---|---:|---:|
+| PRIAN / prianismo | 28 | 0.1% |
+| oposición | 238 | 1.1% |
+| neoliberal | 84 | 0.4% |
+| viejo régimen | 7 | 0.0% |
+| expresidentes | — | — |
+| **periodistas de la lista externa** | **4,385** | **19.5%** |
+
+Total: **4,908 decididas por regla (21.8%)**.
+
+**El resultado se acerca al del humano en el agregado pero no en los casos:**
+
+| | humano · 150 | modelo | con reglas |
+|---|---:|---:|---:|
+| a favor | 36% | 9% | **29%** |
+| en contra | 13% | 21% | **14%** |
+| pregunta | 51% | 70% | **57%** |
+
+**Y el kappa contra el lote 2 bajó de 0.34 a 0.32.** Las reglas ponen «a favor» en la cantidad correcta de preguntas y en las equivocadas. Sirve para una cifra de corpus; **no sirve para decir de una pregunta concreta qué es**.
+
+**Dos advertencias que hay que publicar con el número:**
+
+1. **`oposición` arrastra falsos positivos.** La palabra no siempre nombra al bloque político —«una oposición de un sector de la población de Milpa Alta»— y aparece dentro de críticas al gobierno: «la oposición también podría criticar que su gobierno está reinterpretando estas cifras». Son 238 preguntas y solo el 44% ya eran afín para el modelo.
+2. **La regla por periodista vuelve circular cualquier conteo por periodista.** Si alguien es afín por estar en una lista, no se puede reportar como hallazgo que hace preguntas afines. **Los conteos por persona deben publicarse solo con la capa del modelo.**
+
+Nota: `Salinas` captura también a Ricardo Salinas Pliego. Bajo el criterio del humano se sostiene —es rival del gobierno— y queda dicho para que no parezca descuido.
+
+### Dendrograma de vocabulario (2026-08-30)
+
+Sección nueva del artefacto. **20 periodistas, distancia de Jaccard sobre sus 400 palabras más frecuentes.**
+
+Primero se intentó con los **asuntos** y salió degenerado: todas las distancias entre 0.98 y 0.99, porque el 90% de los asuntos aparece en una sola conferencia y dos periodistas casi nunca comparten uno. Con el **perfil de 18 categorías** y Jaccard ponderado sí discriminaba (0.21–0.65), pero el humano aclaró que quería vocabulario.
+
+Con palabras, top-400 por persona, el rango es **0.579 a 0.824**. Par más parecido: **Hans Salazar y Arturo Pavón**. Más distante: **Karina Vargas y Vicente Serrano** — ella con *presupuesto, recursos, federal, plan, acciones*; él con *medios, censura, paisanos, pueblo, consulado*.
+
+**Contaminación detectada y corregida:** los periodistas se autopresentan dentro de sus preguntas, así que sus propios nombres y los de su medio entraban como vocabulario distintivo. Sin filtrarlos la distancia medía quién se llama cómo. Se quitan los nombres de todos los periodistas y medios del corpus, más las palabras de función.
+
 ### VEREDICTO: la compuerta reprobó contra el lote 2 (2026-08-30)
 
 El corpus completo se clasificó —21,734 preguntas, **$2.53** al precio real— y el instrumento **reprueba** contra el único patrón que quedaba limpio.
