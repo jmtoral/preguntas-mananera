@@ -221,11 +221,25 @@ def recorrer_archivo(
     max_paginas: int = 200,
     espera: float = 1.0,
     vacias_para_parar: int = 2,
+    refrescar: int = 0,
 ) -> Iterator[tuple[int, int]]:
     """Recorre el archivo paginado y guarda los enlaces en el checkpoint.
 
     Rinde `(pagina, cuantos_enlaces)` conforme avanza. Reanudable: las páginas
     ya registradas no se vuelven a pedir.
+
+    `refrescar` vuelve a pedir las primeras N páginas aunque ya estén en el
+    checkpoint. **Sin esto el descubrimiento no ve nunca una conferencia
+    nueva:** el archivo va de lo más reciente a lo más viejo, así que lo nuevo
+    aparece en la página 1, que es justamente la que el checkpoint ya tiene.
+    Se detectó el 2026-09-03 buscando las mañaneras de finales de agosto: el
+    recorrido reportaba cero páginas pendientes y las fechas nuevas salían
+    listadas como huecos, como si no existieran.
+
+    Cada conferencia empuja a las anteriores hacia abajo, así que refrescar
+    unas pocas páginas basta para alcanzar semanas de publicaciones. El
+    checkpoint es append-only y el último registro de un id gana, de modo que
+    volver a pedir una página no pierde nada de lo anterior.
 
     Para tras `vacias_para_parar` páginas seguidas sin artículos. Al 2026-08-21
     la última con contenido era la 108, que cae en el 3-4 de octubre de 2024,
@@ -233,7 +247,9 @@ def recorrer_archivo(
     """
     from playwright.sync_api import sync_playwright
 
-    pendientes = [n for n in range(1, max_paginas + 1) if f"pagina-{n}" not in ck.hechos()]
+    hechas = ck.hechos()
+    pendientes = [n for n in range(1, max_paginas + 1)
+                  if n <= refrescar or f"pagina-{n}" not in hechas]
     if not pendientes:
         return
 
@@ -392,10 +408,14 @@ def leer_urls(origen: Path) -> list[RegistroURL]:
 # ---------------------------------------------------------------------------
 
 
-def main(hasta: date | None = None) -> int:
+def main(hasta: date | None = None, refrescar: int = 5) -> int:
     """Corre el descubrimiento completo y escribe `data/interim/urls.jsonl`.
 
     `python -m estenograficas.descubrimiento`
+
+    `refrescar` vuelve a pedir las primeras N páginas del archivo aunque ya
+    estén en el checkpoint. Por omisión 5, que cubre varias semanas de
+    publicaciones: sin eso el descubrimiento nunca ve una conferencia nueva.
     """
     from .checkpoint import Checkpoint
     from .config import paths
@@ -409,7 +429,8 @@ def main(hasta: date | None = None) -> int:
     ya = len(ck.hechos())
     if ya:
         print(f"   {ya} páginas ya registradas; se reanuda")
-    for n, cuantos in recorrer_archivo(ck):
+    # Refrescar las primeras páginas SIEMPRE: es donde aparece lo nuevo.
+    for n, cuantos in recorrer_archivo(ck, refrescar=refrescar):
         if n % 10 == 0 or cuantos == 0:
             print(f"   página {n:>4}: {cuantos} enlaces")
     de_gobmx, otras = urls_gobmx(ck)

@@ -8,7 +8,11 @@ import json
 
 from estenograficas.checkpoint import Checkpoint
 from estenograficas.config import paths
-from estenograficas.temas_dos_niveles import reconstruir_desde_checkpoint, textos_por_id
+from estenograficas.temas_dos_niveles import (
+    MAX_CARACTERES,
+    reconstruir_desde_checkpoint,
+    textos_por_id,
+)
 
 p = paths()
 ck = Checkpoint("temas_dos_niveles")
@@ -24,6 +28,30 @@ filas = reconstruir_desde_checkpoint(ck, textos)
 #
 # **No se borran del checkpoint**: son la bitácora de lo que se pagó, y el
 # checkpoint es append-only a propósito. Solo se excluyen de la salida.
+# El id es `conferencia-hNN-tNN`, y de esas tres partes **solo el número de
+# hilo se mueve** al recorregir el parser: si una conferencia gana una tanda,
+# todas las siguientes se renumeran. El `orden` del turno no se mueve, porque
+# los turnos no cambiaron. Así que antes de declarar huérfana una fila se
+# intenta reencontrarla por `(conferencia, orden)`, que sí es estable.
+#
+# Esto no es un parche cosmético: sin él, corregir el parser tira a la basura
+# clasificaciones ya pagadas. La corrida del 2026-09-03 iba a perder 8,162.
+def _estable(pid: str) -> str:
+    conf, _, resto = pid.rpartition("-h")
+    return f"{conf}-t{resto.split('-t')[-1]}" if resto else pid
+
+
+por_estable = {_estable(k): k for k in textos}
+recuperadas = 0
+for c in filas:
+    if c.id_pregunta in textos:
+        continue
+    nuevo_id = por_estable.get(_estable(c.id_pregunta))
+    if nuevo_id:
+        c.id_pregunta = nuevo_id
+        c.fragmento = (textos[nuevo_id] or "")[:MAX_CARACTERES]
+        recuperadas += 1
+
 huerfanas = [c for c in filas if c.id_pregunta not in textos]
 filas = [c for c in filas if c.id_pregunta in textos]
 
@@ -45,4 +73,5 @@ print(f"reconstruidos {len(filas)} renglones en {destino}")
 print(f"  del checkpoint : {len(ck.hechos())} hechas, {len(ck.rechazados())} rechazadas")
 sin = sum(1 for c in filas if not c.fragmento)
 print(f"  sin fragmento recuperable: {sin}")
-print(f"  huérfanas excluidas (id ya no existe tras re-parsear): {len(huerfanas):,}")
+print(f"  reencontradas por (conferencia, orden) tras re-parsear: {recuperadas:,}")
+print(f"  huérfanas excluidas (ya no existen ni así): {len(huerfanas):,}")

@@ -73,6 +73,30 @@ Estas ya costaron trabajo descubrirlas. No las vuelvas a descubrir.
 - **La autopresentación del periodista es su propia oración.** `Gracias, Presidenta. Dalila Escobar, de Proceso.` Un regex de `Nombre, de Medio` sin anclar a inicio y fin de oración encuentra seis periodistas en la conferencia del 2026-08-18, que tiene cuatro: se traga `...a Andrés Manuel López Beltrán, de encabezar una red de huachicol`, donde el `de` introduce un verbo y no un medio.
 - **`INTERVENCIÓN:` no es un hablante.** Verificado en `fixtures/2026-08-18.txt`: 5 ocurrencias, ninguna dentro de un bloque de video, contenido siempre `(Inaudible)` o un fragmento fuera de micrófono entre rayas (`—25—`). Es ruido de sala. Se marca `ruido: true` y **no interrumpe la propagación de identidad dentro del hilo**: si se trata como turno normal, parte hilos en dos en silencio, que es exactamente el error que no se detecta mirando el conteo de periodistas.
 
+- **Un hilo solo nace donde hay autopresentación, y eso NO es neutral.** `armar_hilos()` abre tanda cuando alguien dice su nombre. Quien recibe la palabra sin presentarse no genera hilo: sus preguntas se van dentro del hilo del periodista **anterior**, marcadas `propagada`. El error es doble —uno pierde su tanda y otro gana una que no hizo— y no da síntomas: `hilos.jsonl` sale con el 100% de los hilos identificados, que parece una virtud y es el efecto de haberse comido a los que faltan. Lo delató el cotejo contra una fuente externa, no una prueba nuestra.
+
+- **Las presentaciones vienen en tres formas, no en una.** Cerrarlas costó 148 tandas. (a) Con muletilla y conector verbal: `mi nombre es Viridiana Venta **y soy del** periódico Diario Cambio`, `mi nombre es Elsbeth Lenz, **y escribo para** La Política en rosa` —sin admitir esas formas la coma es obligatoria y la presentación se pierde entera—. (b) **Sin conector ninguno**: `Eduardo Esquivel Ancona, Domo de Cristal.` Dos personas con ese estilo valen 19 tandas en seis meses. Aceptarla por pura forma exige candados, porque `En Culiacán, Sinaloa` es idéntica: se prohíbe abrir con preposición, adverbio, cargo o tipo de medio, y se exige que el medio empiece en mayúscula. (c) **Al despedirse**, fuera de la ventana de apertura: `…Muchas gracias.
+
+Soy Gino Ascencio, de Informate y más.` Cinco personas. En la cola se exige muletilla, porque a media conversación cualquier nombre propio es alguien de quien se habla.
+
+- **El medio no siempre cierra en punto.** `de Noticias del Movimiento Conciencia y colaboradora del programa Iztaccíhuatl en El Sendero de la Luna, así como…` corre más de cien caracteres sin puntuación. Exigir el punto perdía los 12 turnos de esa persona. El medio también cierra en `y <oficio>` y en `, así como`.
+
+- **Reparsear renumera los hilos y deja huérfano todo lo que ya se pagó.** El id de una pregunta es `conferencia-hNN-tNN` y el número de hilo se mueve en cuanto una conferencia gana una tanda. El 2026-09-03 quedaron huérfanas 8,162 clasificaciones de tema y 7,414 de postura de golpe. **No se vuelven a pagar:** `(conferencia, orden)` es estable porque los turnos no cambian, y `scripts/remapear_ids.py` las reencuentra todas. Correrlo después de cada cambio del parser.
+
+- **Un CSV de configuración con comentarios `#` arriba se lee vacío y no avisa.** `csv.DictReader` toma la primera línea como cabecera, ninguna columna se llama `variante`, y la tabla de correcciones humanas deja de aplicarse mientras el conteo sigue corriendo tan campante. Los comentarios se quitan antes de que el lector vea el archivo, y si falta la columna se levanta excepción.
+
+## Canonización
+
+**Los nombres se escriben mal y los medios son varios.** Dos problemas distintos, en `src/estenograficas/canonizar.py`.
+
+**La fusión automática de nombres es deliberadamente tímida.** Une cuando una variante es rara y la otra frecuente, que es la firma de una errata. Cuando las dos son frecuentes no las toca y las **reporta**: pueden ser dos personas y unirlas borraría a una. Esa decisión es humana y vive en `config/canonico_periodistas.csv`. Escribir `variante == canonico` es cómo se declara «ya lo revisé, son dos». Resueltos a mano el 2026-09-03: `Sandra Aguilar` y `Sandra Aguilera` son **dos personas** de dos medios; `Rafael Cortés` y `Rafael Montes` también. Las otras seis parejas eran la misma persona.
+
+**Hay correcciones que ningún algoritmo puede ver.** La estenográfica escribe `Yareth Arciniega` en sus 59 ocurrencias y el nombre real es **Yaneth**. No hay grafía mayoritaria correcta contra la cual comparar; solo lo sabe quien conoce la fuente.
+
+**Cada cabecera cuenta su intervención.** Decisión del humano del 2026-09-03: cuando alguien se presenta como `Diario Basta, Tabasco Hoy, Campeche Hoy y Quintana Roo Hoy, de Grupo Cantón`, las cinco estuvieron en esa tanda y las cinco suman una. Pasa en 618 de 2,630 tandas, así que **la suma por medio (3,612) es mayor que el número de tandas y no es doble conteo**: mide presencia de cabecera, no tandas. Contar la cadena entera como una entidad es lo que volvía invisibles a los cuatro periódicos del grupo.
+
+**Comparar y mostrar son cosas distintas.** `clave()` ignora acentos, artículo inicial y descriptor de soporte, para que `El Imparcial` y `Imparcial` sean lo mismo. Lo que se **muestra** conserva el artículo y se elige por mejor capitalización, no por frecuencia: `El imparcial` aparece 22 veces y `El Imparcial` 21, y por frecuencia ganaría la errata. `diario`, `grupo` y `canal` no son descriptores: son parte del nombre en `Diario Basta`, `Grupo Cantón` y `Canal Once`.
+
 ## Contratos de datos
 
 `data/interim/turnos.jsonl`, un renglón por turno de habla:

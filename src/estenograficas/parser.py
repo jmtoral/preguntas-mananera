@@ -434,13 +434,40 @@ _PALABRA_NOMBRE = r"[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+"
 # Subir el tope a 100 recupera 108 detecciones y **no cambia ni una sola de las
 # que ya funcionaban** —verificado sobre los 22,466 turnos—, así que no hay
 # falsos positivos que compensar.
-_MEDIO = r"(?P<medio>[^\.\!\?\n]{2,100}?)\s*[\.\!\?]"
+# El medio casi siempre cierra en punto, pero no siempre: la presentación
+# puede seguir con otro cargo sin cerrar la oración. `Elideth Fernández, de
+# Noticias del Movimiento Conciencia y colaboradora del programa Iztaccíhuatl
+# en El Sendero de la Luna, así como…` corre más de cien caracteres sin un
+# solo punto, y exigirlo perdía sus 12 turnos completos. Se admite cerrar
+# también en `y <oficio>` o en `, así como`, que es exactamente donde la
+# persona deja de nombrar su medio y pasa a su siguiente cargo.
+_FIN_MEDIO = (
+    r"(?:\s*[\.\!\?\n]"
+    r"|\s*,\s+(?:y\s+)?(?:así\s+como|además)\b"
+    r"|\s+y\s+(?:soy\s+)?(?:" + _OFICIO + r")\b)"
+)
+_MEDIO = r"(?P<medio>[^\.\!\?\n]{2,100}?)" + _FIN_MEDIO
 
 # El conector admite `de`, `del` y `para` (`Manuel Pedrero, para Los Reporteros`
 # aparece 41 veces), y deja pasar un `soy` antes del oficio
 # (`Olga Ojeda Lajud, soy corresponsal del Diario del Istmo`).
 _CONECTOR = (
     r"\s*,\s*(?:soy\s+)?(?:" + _OFICIO + r"\s+)?(?:de|del|para)\s+(?:la\s+|el\s+)?"
+)
+
+# Cuando hubo muletilla explícita, la persona ya declaró que se está
+# presentando y el conector puede relajarse sin abrir la puerta a falsos
+# positivos: `mi nombre es Viridiana Venta y soy del periódico Diario Cambio`,
+# `mi nombre es Elsbeth Lenz, y escribo para La Política en rosa`. Sin esta
+# rama la coma es obligatoria y esas dos presentaciones se pierden enteras.
+#
+# La coma NO se vuelve opcional en la rama sin muletilla: ahí es lo único que
+# distingue una presentación de una frase corriente, y quitarla resucita el
+# falso positivo de `López Beltrán, de encabezar una red de huachicol`.
+_CONECTOR_SUAVE = (
+    r"(?:\s*,\s*|\s+)(?:y\s+)?"
+    r"(?:(?:soy|escribo|colaboro|trabajo|reporto)\s+)?"
+    r"(?:" + _OFICIO + r"\s+)?(?:de|del|para|en)\s+(?:la\s+|el\s+)?"
 )
 
 # Con muletilla explícita, la presentación puede empezar a media oración:
@@ -450,17 +477,71 @@ _CONECTOR = (
 _ANCLA_SUAVE = r"(?:^|(?<=[\.\!\?])\s|(?<=[,;:])\s|^\s*)"
 _ANCLA_DURA = r"(?:^|(?<=[\.\!\?])\s|^\s*)"
 
+# Hay quien se presenta SIN conector: `Eduardo Esquivel Ancona, Domo de
+# Cristal.`, `Bertha Alicia Galindo, Alcanzando el Conocimiento.` No es un
+# caso aislado: esas dos personas solas valen 19 tandas en seis meses, y todas
+# se le acreditaban al periodista anterior.
+#
+# Sin `de` que sirva de ancla, el único candado disponible es la forma. Se
+# exigen las cuatro a la vez: inicio de oración, nombre de dos o más palabras
+# capitalizadas, medio que **empieza en mayúscula** —lo que descarta
+# `, de encabezar una red` y `, quien dijo que…`— y cierre en punto dentro de
+# los cien caracteres. Sobre eso se prohíbe explícitamente que el supuesto
+# medio arranque con un cargo o un tratamiento, que es como se cuela
+# `Claudia Sheinbaum, Presidenta de México`.
+_TRATAMIENTO = (
+    r"(?:[Pp]residenta?|[Ss]ecretari[oa]|[Gg]obernador[a]?|[Ll]icenciad[oa]|"
+    r"[Dd]octor[a]?|[Ii]ngenier[oa]|[Mm]aestr[oa]|[Gg]eneral|[Aa]lmirante|"
+    r"[Dd]iputad[oa]|[Ss]enador[a]?|[Tt]itular|[Dd]irector[a]?\s+general|"
+    r"[Ss]ubsecretari[oa]|[Aa]lcaldes?a?|[Ff]iscal|[Mm]inistr[oa]|[Cc]omisionad[oa])\b"
+)
+_SIN_CONECTOR = (
+    r"\s*,\s+(?!" + _TRATAMIENTO + r")(?!" + _OFICIO + r"\b)(?=[A-ZÁÉÍÓÚÑ])"
+)
+
+# Sin `de` que delimite, cualquier oración que empiece con preposición o
+# adverbio capitalizado se disfraza de presentación: `En Culiacán, Sinaloa`,
+# `Sobre Chilpancingo, Guerrero`, `Históricamente Baja California, Morena ha
+# ganado…`. La forma es idéntica a `Eduardo Esquivel Ancona, Domo de Cristal`;
+# lo único que las separa es que la primera palabra no es un nombre de pila.
+#
+# También se prohíbe abrir con un tipo de medio, porque hay quien se presenta
+# al revés —`Canal del Congreso, Elizabeth Robles`— y sin este candado el
+# medio queda registrado como si fuera la persona.
+_NO_ABRE_NOMBRE = (
+    r"(?:Sobre|Primero|Segundo|Tercero|De|Del|En|Desde|Con|Sin|Para|Por|Hacia|"
+    r"Hasta|Ante|Bajo|Tras|Durante|Según|Entre|Sobre|Históricamente|Actualmente|"
+    r"Cambió|Cambia|Es|Son|Está|Están|Fue|Sigue|Hay|Buenos|Buenas|Gracias|"
+    r"Muchas|Muchos|Bueno|Ahora|Aquí|Allí|También|Después|Luego|Entonces|"
+    r"Pero|Aunque|Además|Incluso|Mientras|Cuando|Donde|Como|Porque|Si|No|Ya|"
+    r"Muy|Más|Menos|Todo|Toda|Todos|Todas|Este|Esta|Estos|Estas|Ese|Esa|Otro|"
+    r"Otra|Solo|Sólo|Salvo|Respecto|Mi|Su|Nuestro|Nuestra|Le|Les|Lo|La|El|"
+    r"Canal|Radio|Grupo|Diario|Revista|Periódico|Noticias|Noticiero|Televisa|"
+    r"Portal|Agencia|Semanario|Estación)\b"
+)
+
 _IDENTIDAD = re.compile(
     r"(?:"
-    #  a) con muletilla: ancla suave y el nombre puede ser de una sola palabra
+    #  a) con muletilla: ancla suave, nombre de una sola palabra y conector
+    #     relajado, porque la muletilla ya declaró que esto es una presentación
     + _ANCLA_SUAVE + _MULETILLA
     + r"(?P<nombre>" + _PALABRA_NOMBRE + r"(?:\s+(?:de|del|la|los)\s+)?"
     r"(?:\s*" + _PALABRA_NOMBRE + r"){0,3})"
-    r"|"
-    #  b) sin muletilla: ancla dura y se exigen dos o más palabras
+    + _CONECTOR_SUAVE
+    + r"|"
+    #  b) sin muletilla: ancla dura, dos o más palabras y coma obligatoria
     + _ANCLA_DURA + r"(?P<nombre2>" + _NOMBRE + r")"
-    r")"
-    + _CONECTOR + _MEDIO,
+    + _CONECTOR
+    + r"|"
+    #  c) sin conector: `Nombre Apellido, Medio.` La muletilla, si viene, se
+    #     consume aparte: sin eso el periodista queda registrado como
+    #     `Soy Jonathan Lozada`, que es un nombre nuevo cada vez.
+    + _ANCLA_DURA + r"(?:" + _MULETILLA + r")?"
+    + r"(?!" + _NO_ABRE_NOMBRE + r")"
+    + r"(?P<nombre3>" + _NOMBRE + r")"
+    + _SIN_CONECTOR
+    + r")"
+    + _MEDIO,
     re.MULTILINE,
 )
 
@@ -468,7 +549,35 @@ VENTANA_IDENTIDAD = 300
 """Solo se miran los primeros 300 caracteres: regla dura 4 de CLAUDE.md."""
 
 
+COLA_IDENTIDAD = 260
+"""Ancho de la cola del turno donde también se busca la presentación."""
+
+
 MARCA_REDACTADA = "[identificación removida]"
+
+
+def _buscar_identidad(texto: str) -> tuple[re.Match | None, int]:
+    """Busca la presentación y devuelve `(match, desplazamiento)`.
+
+    Primero en la ventana de apertura, que es donde vive el 99% de las
+    presentaciones. Si ahí no hay nada, en la **cola** del turno: hay quien se
+    identifica al despedirse —`…Muchas gracias.\\n\\nSoy Gino Ascencio, de
+    Informate y más.`— y esa presentación cae fuera de los primeros 300
+    caracteres. Son cinco personas en el corpus y las cinco quedaban
+    acreditadas al periodista anterior.
+
+    En la cola se exige muletilla explícita (`soy`, `mi nombre es`): a media
+    conversación cualquier nombre propio es alguien de quien se habla, y la
+    muletilla es lo único que distingue presentarse de mencionar.
+    """
+    m = _IDENTIDAD.search(texto[:VENTANA_IDENTIDAD])
+    if m:
+        return m, 0
+    if len(texto) <= VENTANA_IDENTIDAD:
+        return None, 0
+    base = max(VENTANA_IDENTIDAD, len(texto) - COLA_IDENTIDAD)
+    m = _IDENTIDAD.search(texto[base:])
+    return (m, base) if m and m.group("nombre") else (None, 0)
 
 
 def redactar_identificacion(texto: str) -> tuple[str, bool]:
@@ -485,24 +594,25 @@ def redactar_identificacion(texto: str) -> tuple[str, bool]:
     conservar la pregunta y no perder la categoría de preguntas de apertura.
     Devuelve `(texto, se_redactó)`.
     """
-    m = _IDENTIDAD.search(texto[:VENTANA_IDENTIDAD])
+    m, base = _buscar_identidad(texto)
     if not m:
         return texto, False
-    return texto[: m.start()] + MARCA_REDACTADA + texto[m.end() :], True
+    i, j = base + m.start(), base + m.end()
+    return texto[:i] + MARCA_REDACTADA + texto[j:], True
 
 
 def identidad_declarada(texto: str) -> tuple[str, str] | None:
     """Extrae (nombre, medio) de la autopresentación, o None.
 
-    Mira únicamente los primeros `VENTANA_IDENTIDAD` caracteres. Un periodista
-    que se presenta lo hace al abrir; un nombre propio que aparece a la mitad
-    del turno es alguien de quien se habla, no quien habla.
+    Mira la ventana de apertura y, si ahí no hay nada, la cola del turno. Un
+    nombre propio a la mitad es alguien de quien se habla, no quien habla; por
+    eso el medio del turno nunca se inspecciona.
     """
-    m = _IDENTIDAD.search(texto[:VENTANA_IDENTIDAD])
+    m, _ = _buscar_identidad(texto)
     if not m:
         return None
     medio = re.sub(r"\s+", " ", m.group("medio")).strip(" ,;")
-    nombre = m.group("nombre") or m.group("nombre2")
+    nombre = m.group("nombre") or m.group("nombre2") or m.group("nombre3")
     return " ".join(nombre.split()), medio
 
 

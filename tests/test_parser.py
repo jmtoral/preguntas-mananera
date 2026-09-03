@@ -84,9 +84,81 @@ def test_la_autopresentacion_debe_ser_su_propia_oracion() -> None:
     )
 
 
-def test_la_identidad_solo_se_busca_en_los_primeros_300_caracteres() -> None:
+def test_a_media_conversacion_un_nombre_no_es_una_presentacion() -> None:
+    """Fuera de la ventana de apertura hace falta muletilla, no basta la forma."""
     relleno = "palabra " * 60  # ~480 caracteres
     assert identidad_declarada(relleno + "Fulano Mengano, de El Universal.") is None
+
+
+def test_hay_quien_se_presenta_al_despedirse() -> None:
+    """Hay quien cierra su turno con `Muchas gracias. Soy Fulano, de Tal`.
+
+    Cinco personas en el corpus se identifican al final del turno, fuera de la
+    ventana de apertura. Sin mirar la cola, sus tandas se le acreditan al
+    periodista anterior: el error es doble, uno pierde y otro gana.
+    """
+    relleno = "Le quiero preguntar por el servicio de agua. " * 12  # ~530 car.
+    assert identidad_declarada(
+        relleno + "\n\nMuchas gracias.\n\nSoy Gino Ascencio, de Informate y más."
+    ) == (
+        "Gino Ascencio",
+        "Informate y más",
+    )
+
+
+def test_hay_presentaciones_sin_conector() -> None:
+    """`Eduardo Esquivel Ancona, Domo de Cristal.` — sin `de` que la ancle.
+
+    No es un caso aislado: dos personas con este estilo valen 19 tandas en
+    seis meses. Se acepta por la forma, con candados, porque no hay otra cosa.
+    """
+    assert identidad_declarada(
+        "Buenos días. Eduardo Esquivel Ancona, Domo de Cristal. Mi primera pregunta."
+    ) == ("Eduardo Esquivel Ancona", "Domo de Cristal")
+
+
+def test_la_rama_sin_conector_no_se_traga_lugares_ni_cargos() -> None:
+    """Los candados de la rama sin conector, que es la que puede inventar gente."""
+    # Preposición o adverbio capitalizado al inicio de oración.
+    assert identidad_declarada("En Culiacán, Sinaloa, la situación es distinta.") is None
+    assert identidad_declarada("Sobre Chilpancingo, Guerrero, quiero preguntar.") is None
+    assert (
+        identidad_declarada("Históricamente Baja California, Morena ha ganado ahí.")
+        is None
+    )
+    # Un cargo no es un medio.
+    assert identidad_declarada("Buenos días. Claudia Sheinbaum, Presidenta de México.") is None
+    # El medio primero y la persona después: no se registra el medio como persona.
+    assert identidad_declarada("Canal del Congreso, Elizabeth Robles. Buenos días.") is None
+
+
+def test_la_muletilla_no_se_queda_pegada_al_nombre() -> None:
+    """Sin consumirla, el periodista se registra como `Soy Jonathan Lozada`."""
+    nombre, _ = identidad_declarada("Soy Jonathan Lozada, Máxima FM, de Chiapas.")
+    assert nombre == "Jonathan Lozada"
+
+
+def test_el_medio_puede_cerrar_en_otro_cargo_y_no_solo_en_punto() -> None:
+    """`…, de Noticias del Movimiento Conciencia y colaboradora del programa…`
+
+    Sin punto a la vista dentro de cien caracteres, exigirlo perdía los 12
+    turnos de esa persona.
+    """
+    assert identidad_declarada(
+        "Buenos días a todos los presentes. Elideth Fernández, de Noticias del "
+        "Movimiento Conciencia y colaboradora del programa Iztaccíhuatl en El "
+        "Sendero de la Luna, así como de otros espacios"
+    ) == ("Elideth Fernández", "Noticias del Movimiento Conciencia")
+
+
+def test_el_conector_admite_las_formas_verbales() -> None:
+    """`y soy del periódico X`, `y escribo para Y`: sin ellas se pierde el hilo."""
+    assert identidad_declarada(
+        "Me presento, mi nombre es Viridiana Venta y soy del periódico Diario Cambio."
+    ) == ("Viridiana Venta", "periódico Diario Cambio")
+    assert identidad_declarada(
+        "Perdón, mi nombre es Elsbeth Lenz, y escribo para La Política en rosa. Hola."
+    ) == ("Elsbeth Lenz", "La Política en rosa")
 
 
 # ===========================================================================

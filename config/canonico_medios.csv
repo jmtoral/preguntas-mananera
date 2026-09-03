@@ -1,0 +1,4 @@
+# Unificaciones de marca declaradas a mano.
+# `variante` es una cabecera tal como la parte el separador; `canonico` es la forma
+# con la que se reporta. Manda sobre la unificación automática por clave.
+variante,canonico

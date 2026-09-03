@@ -1,0 +1,26 @@
+# Correcciones de nombre que ningún algoritmo puede deducir.
+# La columna `variante` es lo que dice la estenográfica; `canonico` es el nombre real.
+# Manda sobre la fusión automática.
+# Resueltas a mano el 2026-09-03 sobre data/outputs/dudas_nombres.csv.
+# Los pares que se dejan aparte se escriben variante==canonico a propósito:
+# así el algoritmo no vuelve a proponerlos como dudosos.
+variante,canonico
+Yareth Arciniega,Yaneth Arciniega
+Yarteh Arciniega,Yaneth Arciniega
+Yareth Arcinaga,Yaneth Arciniega
+Sandra Aguilar,Sandra Aguilar
+Sandra Aguilera,Sandra Aguilera
+Citlali Guerrero,Citlali Guerrero
+Citlalli Guerrero,Citlali Guerrero
+Jonathan Lozada,Jonathan Lozada
+Jhonatan Lozada,Jonathan Lozada
+Alejandra Tornés,Alejandra Tornés
+Alejandra Tornez,Alejandra Tornés
+Claudia Reyna,Claudia Reyna
+Claudia Reina,Claudia Reyna
+Luz Irene Castellanos,Luz Irene Castellanos
+Luz Irene Castellano,Luz Irene Castellanos
+Manuel López,Manuel López
+Emmanuel López,Manuel López
+Rafael Cortés,Rafael Cortés
+Rafael Montes,Rafael Montes
