@@ -95,6 +95,14 @@ Soy Gino Ascencio, de Informate y más.` Cinco personas. En la cola se exige mul
 
 **Cada cabecera cuenta su intervención.** Decisión del humano del 2026-09-03: cuando alguien se presenta como `Diario Basta, Tabasco Hoy, Campeche Hoy y Quintana Roo Hoy, de Grupo Cantón`, las cinco estuvieron en esa tanda y las cinco suman una. Pasa en 618 de 2,630 tandas, así que **la suma por medio (3,612) es mayor que el número de tandas y no es doble conteo**: mide presencia de cabecera, no tandas. Contar la cadena entera como una entidad es lo que volvía invisibles a los cuatro periódicos del grupo.
 
+**El treemap mide concesión de turnos, no asistencia, y el título tiene que decirlo.** La estenográfica registra a quien habló; de quien fue al salón y no recibió la palabra no queda una sola línea. Una cabecera ausente puede no haber ido nunca o haber ido cuarenta veces sin micrófono, y **los datos no distinguen esos dos casos**. Es la regla 7 aplicada a la presentación: cualquier encabezado del tipo «quiénes están en el salón» afirma algo que el corpus no sostiene.
+
+**Un nombre de medio en español empieza como una frase todo el tiempo.** `Sin Embargo`, `Sin Línea`, `Sin Censura TV`, `Somos Más`, `Es ahora AM`, `Así lo dice La Mont`, `Ya es Noticia México`. Un filtro de palabras vacías se lleva 90 intervenciones por delante. Lo que sí delata a una descripción es la subordinada de relativo (`que se transmite en Chihuahua`), el verbo conjugado o la coletilla (`con 90 estaciones en todo el país`).
+
+**Corto no es inválido: `AFP`, `CNN`, `SPR`, `MVS` y `TV4` son cabeceras de tres letras.** Un corte por longitud a secas las borra todas.
+
+**Una cabecera en minúscula puede ser real, y el corpus es quien lo decide.** `corazón de la capital` con 18 intervenciones, `codigolibre`, `aguaquemada`: los medios reales **siempre** tienen un gemelo con mayúsculas —`Corazón de la Capital`, `Código Libre`, `AguaQuemada`—, y las descripciones nunca lo tienen: `un medio público`, `estaciones de radio`, `corresponsal en el sureste`, `bueno`. El candado mira el grupo entero, no la grafía suelta; juzgar cada una por separado borra medios reales.
+
 **Comparar y mostrar son cosas distintas.** `clave()` ignora acentos, artículo inicial y descriptor de soporte, para que `El Imparcial` y `Imparcial` sean lo mismo. Lo que se **muestra** conserva el artículo y se elige por mejor capitalización, no por frecuencia: `El imparcial` aparece 22 veces y `El Imparcial` 21, y por frecuencia ganaría la errata. `diario`, `grupo` y `canal` no son descriptores: son parte del nombre en `Diario Basta`, `Grupo Cantón` y `Canal Once`.
 
 ## Contratos de datos

@@ -529,8 +529,12 @@ _IDENTIDAD = re.compile(
     r"(?:\s*" + _PALABRA_NOMBRE + r"){0,3})"
     + _CONECTOR_SUAVE
     + r"|"
-    #  b) sin muletilla: ancla dura, dos o más palabras y coma obligatoria
-    + _ANCLA_DURA + r"(?P<nombre2>" + _NOMBRE + r")"
+    #  b) sin muletilla: ancla dura, dos o más palabras y coma obligatoria.
+    #     Lleva el mismo candado de apertura que la rama c: sin él, `Del
+    #     Operativo Enjambre, de la detención de algunos presidentes
+    #     municipales` produce un periodista llamado «Del Operativo Enjambre».
+    + _ANCLA_DURA + r"(?!" + _NO_ABRE_NOMBRE + r")"
+    + r"(?P<nombre2>" + _NOMBRE + r")"
     + _CONECTOR
     + r"|"
     #  c) sin conector: `Nombre Apellido, Medio.` La muletilla, si viene, se

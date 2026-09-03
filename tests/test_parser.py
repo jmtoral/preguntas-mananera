@@ -536,3 +536,18 @@ def test_el_tope_largo_no_se_traga_una_oracion_entera():
         "Presidenta, sobre la acusación a Andrés Manuel López Beltrán, de "
         "encabezar una red de huachicol fiscal en el sureste del país, ¿qué…")
     assert ident is None, ident
+
+
+def test_una_frase_capitalizada_no_es_un_periodista() -> None:
+    """`Del Operativo Enjambre, de la detención de algunos presidentes…`
+
+    Tiene la forma exacta de una presentación: nombre capitalizado, coma, `de`,
+    y algo detrás. Lo único que la delata es que empieza con preposición.
+    """
+    for frase in (
+        "Del Operativo Enjambre, de la detención de algunos presidentes municipales.",
+        "De Chiapas, de la Fiscalía de Feminicidios de Chiapas.",
+        "Desde Guadalajara, del canal El Nopal Times.",
+        "El Encuentro Cultural Orígenes, de Los Pinos, fue impresionante.",
+    ):
+        assert identidad_declarada(frase) is None

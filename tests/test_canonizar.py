@@ -124,3 +124,57 @@ def test_si_no_hay_grafia_buena_se_arregla_la_primera_letra() -> None:
     """`revista Contralínea` es la única forma que existe para ese medio."""
     mapa = canonizar_medios(["revista Contralínea"] * 66)
     assert set(mapa.values()) == {"Revista Contralínea"}
+
+
+def test_un_acronimo_corto_es_una_cabecera_valida() -> None:
+    """`AFP`, `CNN`, `SPR`, `MVS`, `TV4`. El corte por longitud las borraba."""
+    for sigla in ("AFP", "CNN", "SPR", "MVS", "TV4"):
+        assert partir_medios(f"de {sigla}") == [sigla]
+    # Pero corto y en minúscula sigue siendo ruido: no queda nada que contar.
+    assert partir_medios("Canal 14, más") == ["Canal 14"]
+
+
+def test_una_frase_no_es_una_cabecera() -> None:
+    """La estenográfica mete la descripción dentro de la enumeración."""
+    assert partir_medios("Máxima FM, que se transmite en Ciudad Juárez") == ["Máxima FM"]
+    assert partir_medios("Grupo Fórmula, con 90 estaciones en todo el país") == [
+        "Grupo Fórmula"
+    ]
+
+
+def test_la_coletilla_de_discurso_se_quita_y_el_medio_se_conserva() -> None:
+    """`y también Altavoz Radio` es Altavoz Radio, no un medio nuevo."""
+    assert partir_medios("Canal 14, SPR, y también Altavoz Radio") == [
+        "Canal 14", "SPR", "Altavoz Radio"
+    ]
+    assert partir_medios("mi canal Lord Molécula") == ["Lord Molécula"]
+
+
+def test_nombres_de_medio_que_empiezan_como_una_frase_se_conservan() -> None:
+    """`Sin Embargo` y `Somos Más` son medios reales, no fragmentos.
+
+    En español los nombres de medios empiezan así todo el tiempo. Un filtro
+    de palabras vacías se los lleva por delante: eran 90 intervenciones.
+    """
+    for nombre in ("Sin Embargo", "Sin Línea", "Sin Censura TV", "Somos Más",
+                   "Es ahora AM", "Ya es Noticia México"):
+        assert partir_medios(f"de {nombre}") == [nombre]
+    # Este lleva una `y` dentro que el separador parte; lo que importa es que
+    # ninguna de las dos mitades se descarte por parecer una frase.
+    assert partir_medios("de Así lo dice La Mont") == ["Así lo dice La Mont"]
+
+
+def test_una_descripcion_que_nunca_lleva_mayuscula_no_es_cabecera() -> None:
+    """`un medio público` describe; `Código Libre` nombra."""
+    mapa = canonizar_medios(["un medio público", "estaciones de radio", "bueno"])
+    assert mapa == {}
+
+
+def test_un_medio_escrito_en_minuscula_sobrevive_si_tiene_gemelo() -> None:
+    """`codigolibre` es Código Libre, y el corpus lo demuestra.
+
+    El candado mira el grupo entero, no la grafía suelta: juzgar cada una por
+    separado borraba `corazón de la capital`, con sus 18 intervenciones.
+    """
+    mapa = canonizar_medios(["Código Libre"] * 44 + ["codigolibre"])
+    assert mapa["codigolibre"] == "Código Libre"

@@ -50,7 +50,46 @@ _NO_ES_MEDIO = {
     "san luis potosi", "baja california", "estado de mexico", "nuevo leon",
     "aguascalientes", "nacional", "mexico", "y del", "asi como", "entre otros",
     "tambien", "ademas", "etcetera", "etc", "otros medios",
+    # Más lugares vistos como continuación: «…, de Máxima FM, en Ciudad Juárez».
+    "cancun", "puerto vallarta", "ciudad juarez", "los angeles", "san diego",
+    "hermosillo", "culiacan", "acapulco", "merida", "cuernavaca", "toluca",
+    "leon", "torreon", "saltillo", "villahermosa", "tuxtla gutierrez", "tepic",
+    "la paz", "el paso", "todo el pais", "el pais", "linea", "en linea",
+    # Plataformas: dónde se publica, no quién publica.
+    "youtube", "facebook", "twitter", "instagram", "tiktok", "whatsapp",
+    "telegram", "redes sociales", "internet", "radio", "television", "prensa",
 }
+
+# Palabras de discurso que preceden a la cabecera y no forman parte del nombre:
+# «…y **también** Altavoz Radio», «**en** La Red», «**mi canal** Lord Molécula».
+# Se quitan, no se descarta el fragmento: detrás hay un medio real. Quitar el
+# `en` es seguro en las 17 apariciones del corpus —todas son lugar, plataforma
+# o `en La Red`— y donde deja un lugar, `_NO_ES_MEDIO` lo descarta después.
+_ARRANQUES = re.compile(
+    r"^(?:(?:y\s+)?(?:ya\s+)?(?:tambi[eé]n|as[ií]\s+como|adem[aá]s(?:\s+de)?)\s+"
+    r"|(?:en|desde|para|dentro\s+de)\s+"
+    r"|(?:mi|su|el|los)\s+canal(?:es)?(?:\s+de\s+redes\s+sociales)?\s+"
+    r"|(?:el\s+)?portal(?:\s+de\s+noticias)?\s+)+", re.I)
+
+# Un fragmento que es una oración, no un nombre. Tres firmas, todas verificadas
+# sobre el corpus: la subordinada de relativo («que se transmite en Chihuahua»,
+# «que dirige la maestra…»), el verbo conjugado dentro, y la coletilla
+# descriptiva («con 90 estaciones en todo el país»).
+#
+# `sin`, `es`, `asi`, `somos` y `ya` **NO** están aquí, aunque parezcan del
+# mismo tipo: `Sin Embargo`, `Sin Línea`, `Sin Censura TV`, `Es ahora AM`,
+# `Así lo dice La Mont`, `Somos Más` y `Ya es Noticia México` son medios reales
+# y sumaban 90 intervenciones. En español los nombres de medios empiezan así.
+_ES_ORACION = re.compile(
+    r"^(?:que|con|cuyo|cuya|donde|quien)\b"
+    r"|\b(?:se\s+transmite|transmite|transmitimos|cubre|cubrimos|pertenece|"
+    r"pertenecen|dirige|dirijo|conduce|conduzco|escribo|colaboro|trabajo|"
+    r"represento|representamos|hacemos|estamos|seguramente|conoce)\b", re.I)
+MAX_PALABRAS_MEDIO = 8
+"""Más palabras que esto y el fragmento es una descripción, no una cabecera."""
+
+_ACRONIMO = re.compile(r"[A-ZÁÉÍÓÚÑ]{2,}\d*")
+"""`AFP`, `CNN`, `SPR`, `MVS`, `TV4`. Cortos y perfectamente válidos."""
 
 # Los dos puntos también separan: «Grupo Healy: El Imparcial, La Crónica…».
 _SEPARADORES = re.compile(r"\s*[;,:]\s*|\s+y\s+|\s+e\s+|\s*/\s*|\s*\|\s*")
@@ -184,7 +223,15 @@ def partir_medios(cadena: str | None) -> list[str]:
     partes, vistos = [], set()
     for trozo in _SEPARADORES.split(cadena):
         t = _PREFIJOS.sub("", trozo.strip(" .-—·")).strip()
-        if len(t) < 4 or _plano(t) in _NO_ES_MEDIO:
+        t = _ARRANQUES.sub("", t).strip(" .-—·…")
+        # Corto **no** quiere decir inválido: `AFP`, `CNN`, `SPR`, `MVS` y
+        # `TV4` son cabeceras de tres letras. El corte por longitud a secas
+        # las borraba todas. Se admite el acrónimo y se rechaza el resto.
+        if len(t) < 4 and not _ACRONIMO.fullmatch(t):
+            continue
+        if _plano(t) in _NO_ES_MEDIO:
+            continue
+        if _ES_ORACION.search(_plano(t)) or len(t.split()) > MAX_PALABRAS_MEDIO:
             continue
         k = clave(t)
         if k and k not in vistos:
@@ -210,6 +257,18 @@ def canonizar_medios(
         por_clave.setdefault(clave(nombre), Counter())[nombre] = n
     mapa = {}
     for variantes in por_clave.values():
+        # Una cabecera que en 460 conferencias NUNCA se escribió con una
+        # mayúscula no es un nombre, es una descripción: `un medio público`,
+        # `estaciones de radio`, `corresponsal en el sureste`, `bueno`.
+        #
+        # El candado tiene que mirar el corpus entero y no la cadena suelta,
+        # porque los medios reales sí aparecen en minúscula a veces —
+        # `corazón de la capital` 18 veces, `codigolibre`, `aguaquemada`— y
+        # **siempre** tienen un gemelo con mayúsculas: `Corazón de la Capital`,
+        # `Código Libre`, `AguaQuemada`. Juzgar cada grafía por separado
+        # borraba esos medios; juzgar el grupo los conserva.
+        if not any(c.isupper() for v in variantes for c in v):
+            continue
         # La grafía que se muestra es la mejor capitalizada, y la frecuencia
         # solo desempata. `El imparcial` aparece 22 veces y `El Imparcial` 21:
         # por frecuencia ganaría la errata. Se cuentan las palabras con
@@ -247,7 +306,9 @@ def aplicar(hilos: list[dict], config: Path | None = None) -> list[dict]:
     for h in hilos:
         if h.get("periodista"):
             h["periodista"] = nombres.get(h["periodista"], h["periodista"])
-        cabeceras = [medios.get(c, c) for c in partir_medios(h.get("medio"))]
+        # Lo que no está en el mapa fue descartado por `canonizar_medios` como
+        # descripción y no como cabecera. Se omite, no se deja pasar crudo.
+        cabeceras = [medios[c] for c in partir_medios(h.get("medio")) if c in medios]
         h["medios"] = cabeceras
         h["medio"] = cabeceras[0] if cabeceras else h.get("medio")
     return hilos
