@@ -36,6 +36,38 @@ El caso que parecía excepción lo cubre la regla 3: si le pegas a un tercero pe
 
 **Valores vigentes:** `crítica al gobierno`, `afín al gobierno`, `neutral`, más `no clasificable` que es un hueco declarado.
 
+### El error más grande del parser, encontrado por una fuente externa (2026-08-30)
+
+Una periodista que cubre la fuente avisó que **Juan Hernández, de Grupo Cantón, no aparecía en nuestros conteos** aunque en su análisis de 2026 salía en cuarto lugar. Tenía razón, y el hueco era mucho mayor de lo que ella vio.
+
+**La causa:** el tope de longitud del nombre del medio en `_MEDIO` estaba en 70 caracteres. Él se presenta así:
+
+> «Juan Hernández, de Diario Basta, Tabasco Hoy, Campeche Hoy y Quintana Roo Hoy, **de Grupo Cantón**»
+
+Son **75 caracteres de medio**, cinco por encima del tope. El regex no casaba y el turno se le acreditaba al periodista anterior.
+
+**No era un caso aislado.** Quien representa a un grupo editorial enumera sus cabeceras y pasa de 70 sin esfuerzo. Medido sobre los 20,161 turnos propagados: **60 autopresentaciones perdidas, 19 personas afectadas.**
+
+**Corrección:** tope a 100 caracteres. Recupera **108 detecciones y no cambia ni una** de las que ya funcionaban —verificado sobre los 22,466 turnos—, así que no hay falso positivo que compensar. La prueba que protege contra el falso positivo de López Beltrán sigue pasando; se agregaron dos pruebas nuevas.
+
+**Efecto en los conteos, en preguntas:**
+
+| | antes | ahora | |
+|---|---:|---:|---|
+| Juan Hernández · Grupo Cantón | 31 | **627** | +596 |
+| Shaila Rosagel · Grupo Healy | 13 | **288** | +275 |
+| Marco Antonio Olvera · Hidalgo News | 139 | **364** | +225 |
+
+En intervenciones, Juan Hernández pasa de **4 a 60** y entra al tercer lugar del corpus. Y bajan los que absorbían sus turnos: Zeltzin Juárez −74, Carlos Guzmán −57, César Huerta −41, Mara Rivera −33, Arturo Pavón −29, Nancy Flores −25.
+
+El corpus creció de 22,466 a **22,975 preguntas útiles** y de 373 a **377 periodistas**.
+
+**Por qué esto no lo encuentra una prueba unitaria.** El conteo no daba error: le sumaba a la persona equivocada. Desde adentro todo se veía consistente. Hace falta un conteo externo —alguien que conozca el salón— para detectarlo. Es el segundo hallazgo importante que sale de contrastar con esa fuente; el primero fue que las tandas coincidían 10 de 10.
+
+**Costo de rehacer:** 4,161 clasificaciones de tema perdieron su llave al renumerarse los ids. Reclasificarlas costó **$0.58** (estimado $1.14). El corpus temático queda en **22,255 de 22,318 (100%)**.
+
+**Defecto derivado, también corregido.** `reconstruir_temas.py` emitía los renglones del checkpoint cuyo id ya no existe: 4,161 huérfanos sin texto ni fragmento, que se colaban al dataset y contaminaban los conteos. Ahora se filtran contra el corpus vigente y se reportan. **No se borran del checkpoint** —es la bitácora de lo que se pagó y es append-only a propósito—, solo se excluyen de la salida.
+
 ### Capa de reglas por mandato del humano (2026-08-30)
 
 Después del veredicto, el humano ordenó clasificar por reglas, reconociendo que no es científico:

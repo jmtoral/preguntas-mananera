@@ -416,7 +416,25 @@ _OFICIO = (
 # `Soy Jonás` como un nombre de dos palabras y el periodista queda registrado
 # como "Soy Jonás".
 _PALABRA_NOMBRE = r"[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+"
-_MEDIO = r"(?P<medio>[^\.\!\?\n]{2,70}?)\s*[\.\!\?]"
+# El tope de longitud del medio estaba en 70 y **perdía presentaciones enteras**.
+# Lo encontró una periodista que cubre la fuente al notar que Juan Hernández, de
+# Grupo Cantón, no aparecía en nuestros conteos: se presenta como
+# `Juan Hernández, de Diario Basta, Tabasco Hoy, Campeche Hoy y Quintana Roo
+# Hoy, de Grupo Cantón` — 75 caracteres de medio, cinco por encima del tope.
+#
+# No era un caso aislado ni un capricho de una persona: quien representa a un
+# grupo editorial enumera sus cabeceras, y ahí se van 70 caracteres sin
+# esfuerzo. También caían Shaila Rosagel (Grupo Healy: El Imparcial, La Crónica
+# y Frontera) y Marco Antonio Olvera.
+#
+# Cada fallo es un error DOBLE: la persona pierde su intervención y el
+# periodista anterior gana una que no hizo. Medido: 60 autopresentaciones
+# perdidas, 19 personas, y 24 de ellas acreditadas a Aissa García.
+#
+# Subir el tope a 100 recupera 108 detecciones y **no cambia ni una sola de las
+# que ya funcionaban** —verificado sobre los 22,466 turnos—, así que no hay
+# falsos positivos que compensar.
+_MEDIO = r"(?P<medio>[^\.\!\?\n]{2,100}?)\s*[\.\!\?]"
 
 # El conector admite `de`, `del` y `para` (`Manuel Pedrero, para Los Reporteros`
 # aparece 41 veces), y deja pasar un `soy` antes del oficio

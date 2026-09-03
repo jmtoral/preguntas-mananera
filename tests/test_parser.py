@@ -434,3 +434,33 @@ def test_otros_funcionarios_no_se_confunden_con_la_presidenta():
         "DIRECTOR GENERAL DEL IMSS",
         "ZOÉ ROBLEDO ABURTO",
     )
+
+
+def test_medio_con_varias_cabeceras_no_rompe_la_identificacion():
+    """El tope de longitud del medio perdía presentaciones enteras.
+
+    Quien representa a un grupo editorial enumera sus cabeceras y se pasa de 70
+    caracteres sin esfuerzo. Lo encontró una periodista de la fuente al notar
+    que Juan Hernández no aparecía en los conteos: 32 de sus 37 intervenciones
+    se le estaban acreditando al periodista anterior.
+    """
+    casos = [
+        ("Qué tal, muy buenos días a todos y a todas. Juan Hernández, de Diario "
+         "Basta, Tabasco Hoy, Campeche Hoy y Quintana Roo Hoy, de Grupo Cantón. "
+         "Primero, nada más precisar…", "Juan Hernández"),
+        ("Buenos días. Shaila Rosagel, de Grupo Healy: El Imparcial, de Sonora; "
+         "La Crónica, de Mexicali, y Frontera, de Tijuana. Presidenta, sobre…",
+         "Shaila Rosagel"),
+    ]
+    for texto, esperado in casos:
+        ident = identidad_declarada(texto)
+        assert ident is not None, f"no detectó a {esperado}"
+        assert ident[0] == esperado, ident
+
+
+def test_el_tope_largo_no_se_traga_una_oracion_entera():
+    """Subir el tope no debe volver medio a cualquier cosa que siga a una coma."""
+    ident = identidad_declarada(
+        "Presidenta, sobre la acusación a Andrés Manuel López Beltrán, de "
+        "encabezar una red de huachicol fiscal en el sureste del país, ¿qué…")
+    assert ident is None, ident
