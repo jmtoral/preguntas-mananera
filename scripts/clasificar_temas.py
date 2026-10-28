@@ -30,6 +30,7 @@ import json, re, sys, time
 from pathlib import Path
 from estenograficas.checkpoint import Checkpoint
 from estenograficas.config import paths
+from estenograficas.ids import id_estable
 from estenograficas.temas_dos_niveles import (
     Gasto,
     cargar_taxonomia,
@@ -105,8 +106,12 @@ reintentar = {
     if any(x in (r.get("razon") or "") for x in REINTENTABLES)
 } - hechos
 con_ctx = sum(1 for _, t in preg if t.startswith("CONTEXTO"))
-ya_todo = ck.procesados() - reintentar
-faltan = [(i, t) for i, t in preg if i not in ya_todo]
+# Se compara por (conferencia, orden), no por el id con número de hilo: el
+# checkpoint es append-only y conserva los ids de cuando se pagó, mientras que
+# el corpus se renumera con cada reparseo. Comparando ids exactos se volvían a
+# pagar las clasificaciones ya hechas bajo el número de hilo anterior.
+ya_todo = {id_estable(i) for i in ck.procesados() - reintentar}
+faltan = [(i, t) for i, t in preg if id_estable(i) not in ya_todo]
 
 print(f"preguntas en el universo : {len(preg):,}  ({con_ctx:,} con contexto)", flush=True)
 print(f"debajo del mínimo        : {len(muy_cortas):,} "
@@ -135,7 +140,10 @@ gasto = Gasto()
 n = 0
 t0 = time.time()
 with open(salida, "a", encoding="utf-8") as f:
-    for c in clasificar_paralelo(preg, claves, cats_txt, ck, vocab=vocab,
+    # Se le pasa `faltan`, no `preg`: el ejecutor decide "ya hecho" por id exacto,
+    # y con `preg` repaga todo lo clasificado bajo un número de hilo anterior
+    # (2,519 repetidas, $0.34, el 2026-10-06). `faltan` ya se filtró por llave estable.
+    for c in clasificar_paralelo(faltan, claves, cats_txt, ck, vocab=vocab,
                                  reintentar=reintentar, gasto=gasto):
         f.write(json.dumps(c.to_dict(), ensure_ascii=False) + "\n")
         n += 1
