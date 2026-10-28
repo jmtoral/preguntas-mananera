@@ -6,6 +6,303 @@ Regla de escritura: se describe lo que **pasó**, no lo que se pretendía. Un ha
 
 ---
 
+## Estado al 2026-10-28
+
+### Los dos artefactos viven ahora en GitHub Pages, con corte al 30 de septiembre
+
+**Sitio:** https://jmtoral.github.io/preguntas_mananeras/ — repo aparte, `jmtoral/preguntas_mananeras`
+(clonado en `D:\PROYECTOS_PERSONALES\preguntas_mananeras`). Tres pestañas: **Metodología** (escrita a
+mano en `index.html`, con diagrama Mermaid), **Quién pregunta** (`exploracion.html`) y **Buscador**
+(`buscador.html`), las dos últimas en iframe. `index.html#revisar` abre el buscador en su vista de
+«revisar». Los artefactos de claude.ai **no se actualizaron**; siguen en sus versiones 5 y 22.
+
+**La exploración tiene por fin un generador que no se pierde:** `scripts/exploracion.py --hasta
+2026-09-30`, con plantilla en `assets/exploracion_plantilla.html` (CSS y scripts extraídos de la v22).
+Recalcula las diez secciones con **un solo corte y una sola canonización**. La v22 mezclaba cortes
+(31 de agosto y 5 de octubre) y grafías: Hans Salazar salía con 67 y 66 intervenciones en secciones
+distintas, «Yaneth» y «Yareth», medios crudos en unas y canonizados en otras. Validado: con corte al
+5 de octubre reproduce exacto «revisar» (20,787 / 1,774 / 1,402) y temas por mes (23,694).
+`exportar_buscador.py` ganó `--hasta`. Las dos páginas dan las mismas 24,290 preguntas.
+
+Cifras al corte: 485 conferencias (481 con prensa), 68,345 turnos, 24,290 preguntas, 2,737 tandas,
+383 periodistas, 620 medios, 23,560 preguntas con tema (97%).
+
+**Corrección de fondo, en `buscar.intercambios()`:** las 399 preguntas `incierta` (gritos del pleno)
+se le cargaban al periodista de la tanda, contra la regla de CLAUDE.md. Ahora salen sin periodista ni
+medio en el buscador, la línea de comandos, `revisar.py` y la exploración. Las 171 pruebas pasan.
+
+**Otras cosas que cambiaron de la v22 a esta versión, a propósito:**
+- `mapa_consolidacion.json` era del 3 de septiembre y no cubría 4,345 clasificaciones; se regeneró con
+  `consolidar_asuntos.py` (umbral 0.6, el que se usó siempre). El respaldo del anterior quedó en el
+  scratchpad de la sesión. La v22 decía «al menos la mitad del vocabulario» y «el mayor grupo, 234
+  variantes»: el umbral era 0.6 y esos 234 eran el cubo de meta-etiquetas, no un asunto. Corregido.
+- Categorías con el nombre de la taxonomía (`nombre`) en todas las secciones; la v22 usaba dos juegos.
+- «Cuánto contesta» se mide por **pregunta** (palabras de ella hasta la siguiente pregunta, solo sus
+  turnos), así la razón es exactamente respuesta/pregunta.
+- La sección de dinero sale de `config/puente_medios.csv`, con intervenciones recontadas por `clave()`;
+  un medio ya pareado no aparece además como «sin investigar» (le pasaba a Heraldo).
+
+**Ronda de identidad del 2026-10-28 (hecha y publicada).** Arreglos en `parser.py`, cada uno con
+prueba: el medio cierra también en subordinada o coletilla (`, que…`, `, al que…`, `, con…`), en `…` y
+en raya; la muletilla puede ir pegada a una raya (`—soy Gloria Carpio, de Diario Imagen—`); la
+presentación tiene que empezar en la ventana de 300 pero el medio puede terminar fuera (`EXTRA_MEDIO`).
+Verificado sobre los 28,786 turnos de prensa: **ninguna persona cambia** en presentaciones que ya
+funcionaban (17 solo acortan la descripción del medio). Tabla nueva `config/identidades_manuales.csv`
+(25 filas, `metodo_identificacion: manual`, manda sobre el regex; `parseo` avisa si una fila no abre
+hilo). `canonico_periodistas.csv`: Tere Moya → Tere Mora Guillén y Lucio Espinosa → Espinoza Chavira
+(grafía mayoritaria; **confirmar con el humano**). Reparseo: turnos idénticos, 397 preguntas cambian
+de dueño, 99 entran a tandas, `remapear_ids.py` recupera todo (0 perdidas). Al corte: 2,796 tandas,
+24,379 preguntas, 395 periodistas, 632 medios, 482 conferencias con tanda. **Tere Mora Guillén: 25
+intervenciones, antes cero.** Las 89 preguntas nuevas no tienen tema (no se gastó API).
+
+**Segunda ronda, la clase grande (hecha en local, SIN publicar ni commit).** Nombre tras una fórmula de
+cortesía de lista cerrada (`_PREAMBULO`: «Buenos días, Vicente Serrano, de…»); «Presidenta» sin coma
+antes del nombre; el ancla de oración acepta `…` y raya (`_ANCLA_DURA`), menos la rama sin conector, que
+se queda con `_ANCLA_ORACION`; «Soy» no abre nombre; forma sin coma (`_IDENTIDAD_SIN_COMA`, «Nancy
+Flores de la revista Contralínea.») **solo para nombres que en otra parte del corpus se presentaron
+completos** (`conocidos`, segunda pasada en `parseo`): sin ese candado daba 10 instituciones por 12
+periodistas. 0 presentaciones previas cambian; 86 nuevas + 2 manuales (Ramón Flores en inciso).
+Al corte: 2,883 tandas, 24,482 preguntas, 397 periodistas; 564 preguntas cambian de dueño. **Ramón
+Flores 15 → 29 intervenciones.** Señal de saludo 140 → 118: lo que queda es casi todo la misma persona
+saludando de nuevo. 922 preguntas sin tema. Respaldo del estado anterior en el scratchpad (`r2/`).
+
+**Lo que sigue (texto previo a la segunda ronda), la clase grande:** 140 preguntas `propagada` empiezan saludando, que delata a otra
+persona. Muestra: «Buenos días, Vicente Serrano, de Sin Censura TV» (tras coma, no al inicio de
+oración), «Nancy Flores de la revista Contralínea» (sin coma), «Primero, Manuel Galeazzi, de Sin
+Línea». Arreglarlo exige relajar `_ANCLA_DURA` o la coma obligatoria, que es el candado contra
+«López Beltrán, de encabezar una red»: hacerlo con la misma foto antes/después de `identidad_declarada`.
+Pendiente también: «Mi nombre es Grecia» (2026-08-07 t98), etiqueta `PARTICIPANTE…:` incrustada en un
+turno de prensa; problema del partidor de etiquetas.
+
+**485 contra 481 conferencias** (texto previo a la ronda; ahora son 482). 485 leídas; 481 con al menos una tanda. Las 4 restantes: 2025-10-03
+(sin prensa), 2026-05-29 (solo saludos), 2024-12-18 (nadie dice su nombre) y **2025-04-07, que es un
+hueco del lector**: «Mi nombre es Christian Mart y soy creador de contenido…» y «Mi nombre es Orlando
+Zúñiga, me dedico al contenido…» son presentaciones **sin medio**, y `_IDENTIDAD` exige uno; también
+«Capital 21, Corazón de la capital» es medio sin nombre. No se tocó el lector: cambiarlo renumera hilos
+(correr `remapear_ids.py` después). Pendiente medir cuántas presentaciones sin medio hay en el corpus.
+
+**Para actualizar el corte:** correr los dos scripts con `--hasta`, copiar las dos salidas al repo del
+sitio y ajustar a mano las cifras de `index.html`. Lo dice su README.
+
+---
+
+## Estado al 2026-10-06
+
+### Corpus actualizado a septiembre: 488 conferencias, del 2024-10-03 al 2026-10-05
+
+22 conferencias nuevas (19 de septiembre, 3 de octubre). Descubrimiento, descarga, parseo y
+clasificación temática corridos. **Postura NO se corrió** para septiembre: reprobó la compuerta y
+cuesta dinero, así que `postura_final.jsonl` llega al 31 de agosto.
+
+**Trampa nueva del descubrimiento, y no da síntomas obvios.** El archivo de gob.mx es paginado y
+el checkpoint guarda páginas por número. Cuando entran artículos nuevos, todo se corre hacia atrás:
+las páginas viejas del checkpoint ya no contienen lo que contenían. `refrescar=5` (el default) dejó
+agosto de 2026 con **3 conferencias en vez de 21**; `refrescar=16` todavía perdía. Lo seguro es
+repasar todo el archivo —son 121 páginas, gratis y en un par de minutos—:
+
+```
+PYTHONPATH=src python -c "from estenograficas.descubrimiento import main; raise SystemExit(main(refrescar=140))"
+```
+
+La señal para verificarlo es el conteo por mes que imprime: ningún mes completo con menos de 17.
+Propuesta para `CLAUDE.md` (no se hizo: ese archivo no se toca sin consultar): agregar esto a las
+trampas conocidas, o cambiar el default de `refrescar`.
+
+El único rechazo nuevo de la descarga es un slug de Wayback con el año cortado
+(`...-del-18-de-diciembre-de-`): una redirección de 16 KB. Los dos 18 de diciembre (2024 y 2025)
+ya están en disco; no falta ninguna conferencia.
+
+**El reparseo no cambió nada de lo anterior:** 0 turnos viejos alterados, 0 hilos renumerados,
+0 atribuciones cambiadas en 26,322 preguntas. Las 27 etiquetas de hablante nuevas son todas reales
+(funcionarios, gobernadores, invitados por videollamada). 117 hilos nuevos, ninguno sin identificar.
+
+### Se repagaron 2,519 clasificaciones de tema: $0.34 tirados
+
+**Qué pasó.** `clasificar_temas.py --dry` anunció 5,444 pendientes cuando las conferencias nuevas
+aportaban ~1,200. Causa: el checkpoint es append-only y guarda los ids con el número de hilo de
+cuando se pagó; `remapear_ids.py` arregla los `.jsonl` pero no el checkpoint. Comparando por id
+exacto, todo lo renumerado el 2026-09-03 parecía pendiente. Se corrigió la comparación del script
+para usar `(conferencia, orden)` y el `--dry` bajó a 1,204. **Pero el ejecutor
+(`clasificar_paralelo`, `temas_dos_niveles.py:417`) hace su propio filtro por id exacto sobre la
+lista completa que recibe**, así que la corrida real repagó lo ya hecho. Se detuvo a mano cuando el
+contador pasó de 2,400 contra 1,204 anunciadas.
+
+**Arreglo:** el script ahora le pasa `faltan` al ejecutor, no `preg`. La corrida correcta clasificó
+1,069 (7 rechazadas) por **$0.14 reales**. Gasto total del día: $0.48.
+
+**Limpieza:** las 2,521 entradas repetidas del checkpoint y sus 20 rechazos quedaron apartados en
+`data/checkpoints/temas_dos_niveles.{hechos,rechazos}.repetidas_2026-10-06.jsonl`, **no borrados**.
+Las 128 legítimas de esa corrida se conservaron. `vocab_asuntos.json` se recortó a sus 18,848 nombres
+previos: la corrida le había metido ~1,560 nombres inventados para preguntas viejas. Respaldo de los
+cuatro archivos antes de tocarlos en el scratchpad de la sesión.
+
+**Lección:** el `--dry` y lo que realmente se manda a la API tienen que salir de la misma selección.
+Vigilar el contador contra la cifra anunciada en los primeros minutos de cualquier corrida.
+
+**Detalle menor:** `--dry` no es del todo en seco: escribe al checkpoint los rechazos por texto
+demasiado corto. Es correcto que queden registrados, pero no es una corrida sin efectos.
+
+### Dos defectos de datos encontrados, ninguno causado hoy
+
+1. **4,122 preguntas tienen dos clasificaciones de tema** en `temas_dos_niveles.jsonl` (26,619 filas
+   para 22,497 preguntas antes de hoy). Vienen de la reclasificación del 2026-09-03: la versión vieja
+   se reencuentra por `(conferencia, orden)` y la nueva también. **En 1,313 las dos dan categoría
+   distinta.** `buscar.py` y todo lo que se arma desde `cargar_anexos()` se queda con la última.
+   Cualquier conteo que sume líneas del archivo las cuenta dos veces. Falta decidir cuál gana y
+   deduplicar en `reconstruir_temas.py`.
+2. **«Medios de comunicación» no es comparable en el tiempo.** Además del tema real, recoge turnos
+   sin contenido (agradecimientos, «pregunta incompleta», «turno de preguntas»): 72, 64 y 37 en
+   junio, julio y agosto de 2026, y **3** en septiembre. La tasa de rechazos es igual todos los meses
+   (3–5%), así que no es que se rechacen: la corrida nueva los manda a otra parte o los describe
+   distinto. La serie mensual de esa categoría cae en septiembre por clasificación, no por conducta.
+   Salida posible sin API: marcar esos asuntos con una regla y sacarlos a una categoría propia.
+
+### «Lo que la presidenta dijo que iba a revisar»: pedido de Nayeli Roldán
+
+Preguntó en cuántas respuestas Sheinbaum dice «revisar» o «se está revisando», y qué prometió
+revisar. El buscador no podía contestarlo: **fundía en un solo texto todo lo que respondían los
+funcionarios de un intercambio**, así que no había forma de buscar solo en sus palabras.
+
+**`buscar.py`:** `intercambios()` ahora conserva `quien_por_turno`, paralelo a `respuestas`. Opción
+nueva `--responde sheinbaum`: con `--en respuesta` busca solo en los turnos de esa persona.
+
+**Buscador web:** la casilla «buscar también en respuestas» se volvió un selector (pregunta /
+pregunta y respuesta / solo respuesta). Las respuestas viajan turno por turno con su hablante, y con
+«quién responde» elegido se busca solo en sus palabras. **Se encontró y corrigió un defecto viejo:**
+el JavaScript usaba `\b`, que solo conoce letras ASCII, así que ninguna palabra que empezara o
+terminara en vocal acentuada casaba nunca (`revisó`, `José`, `está`). Ahora web y línea de comandos
+dan exactamente las mismas cifras; se verificó en Chrome.
+
+**`scripts/revisar.py`.** Por cada oración de la presidenta, el verbo, la forma y el sujeto, con
+`metodo: regex`. **Ningún modelo, ningún costo.** Escribe `data/outputs/busquedas/sheinbaum_revisar.csv`.
+
+- **Forma** (para «revisar»): compromiso, en curso, encargo, necesidad, hecho, otra. Una pregunta
+  toma la forma más comprometida de su respuesta.
+- **Verbos de proceso**, decisión del humano: ver, analizar, investigar, evaluar, estudiar, valorar,
+  consultar, checar, verificar, averiguar, **solo en construcción de gerundio** con estar o seguir
+  («se está viendo legalmente qué procede»). Fuera: «vamos a ver» (muletilla) y «estamos trabajando»
+  (1,517 oraciones, demasiado genérico; **el humano vio ejemplos y no ha decidido**).
+- **Nombre neutral**, decisión del humano: «en proceso», no «evasiva». El corpus no marca cuáles son
+  una forma de no responder.
+- **Sujeto aparte**, decisión del humano: ella o su gobierno («estamos analizando»), sin sujeto
+  («se está viendo»), otra persona o institución («lo está evaluando el canciller»).
+
+Cifras al 5 de octubre: de **20,787** preguntas que contestó ella misma, **1,774** traen alguno de los
+verbos y **1,402** son promesa, encargo, necesidad o proceso en curso. Por verbo: revisar 1,358,
+ver 302, investigar 64, analizar 53.
+
+**La precisión de las reglas no está medida.** Se ajustaron leyendo muestras. Antes de que alguien
+cite una cifra, hace falta codificar a mano ~100 oraciones y reportar el acierto.
+
+### Artefactos publicados hoy
+
+| artefacto | versión | qué cambió |
+|---|---|---|
+| Buscador `9pERmoovv3hn7Q994u6mGu` | 5 | septiembre; pestaña «Revisar y procesos en curso» con filtros por forma, tema, verbo y sujeto |
+| Exploración `NKd3QywcsisF2eD9V3HL9g` | 22 | sección «Revisar, ver, analizar»; gráfica nueva «De qué se pregunta, mes a mes» |
+
+**El artefacto de exploración tiene ahora dos cortes:** las dos secciones nuevas llegan al 5 de
+octubre; las demás siguen al 31 de agosto. Cada sección nueva lo dice. Actualizar el resto exige
+reescribir sus generadores, que se perdieron con el scratchpad de la sesión anterior.
+
+**Los generadores de hoy también viven en el scratchpad** y se van a perder igual:
+`actualizar_exploracion.py` (parte de la v21 publicada) y `editar_plantilla.py`. Si las secciones
+se van a mantener, hay que moverlos a `scripts/`.
+
+**La gráfica por tema** cuenta preguntas clasificadas por mes (una clasificación por pregunta, la
+misma que usa el buscador). Ocho temas con color de la paleta validada y los otros diez juntos en
+gris; octubre no se dibuja porque lleva 3 conferencias, pero está en la tabla. «Medios de
+comunicación» empieza apagada y, al activarla, aparece la advertencia del defecto 2.
+
+### Pendiente, en orden
+
+1. **Respaldar `data/raw/` fuera del repo.** Ahora son 488 archivos. Pendiente desde agosto.
+2. Decidir si «trabajando» entra a los verbos de proceso.
+3. Medir la precisión de `revisar.py` con una muestra codificada a mano.
+4. Deduplicar las 4,122 dobles clasificaciones y decidir cuál gana.
+5. Regenerar las búsquedas guardadas de `data/outputs/busquedas/` y la cobertura del `LEEME.md`:
+   son de antes de septiembre (`sheinbaum_revisar.csv` sí está al día).
+6. Commit de `clasificar_temas.py`, `revisar.py`, `buscar.py`, `exportar_buscador.py` y la plantilla.
+
+---
+
+## Estado al 2026-09-07, de noche
+
+### El corpus tiene un segundo uso: consulta para reportería
+
+Nayeli Roldán —la periodista que cubre la fuente y que en agosto detectó que
+Juan Hernández, de Grupo Cantón, faltaba en los conteos— pidió poder buscar por
+tema de coyuntura **quién preguntó qué y quién respondió**. Lo estaba haciendo a
+mano, conferencia por conferencia. Preguntó si existían las versiones o un
+prompt; la respuesta correcta no era un prompt, era una búsqueda sobre lo que ya
+está parseado.
+
+**`scripts/buscar.py`.** Línea de comandos. Recorre `hilos.jsonl` y produce
+*intercambios*: un turno de pregunta más los turnos de respuesta que le siguen
+hasta la siguiente pregunta. Salida en CSV y en Markdown legible, con enlace a
+la estenográfica de gob.mx en cada resultado. Filtros por fecha, periodista y
+medio. `--listar-asuntos` no escribe nada: enseña qué asuntos temáticos casaron,
+para calibrar los términos antes de gastar una corrida.
+
+Detalle de la búsqueda que costó descubrir dos veces: **el anclaje a palabra
+completa impide buscar raíces.** `--y amenaz` devolvía cero contra un corpus
+lleno de «amenazas». Un `*` en un extremo suelta el anclaje de ese lado
+(`amenaz*`), y la barra vertical admite alternativas dentro de un mismo
+requisito obligatorio (`--y "arancel*|militar"`). Sin las dos cosas hay que
+enumerar conjugaciones a mano, que es exactamente donde se pierden resultados
+sin que nada avise.
+
+Las cuatro coyunturas que pidió, ya corridas y en `data/outputs/busquedas/`:
+
+| tema | intercambios | conferencias |
+|---|---:|---:|
+| Organismos autónomos | 76 | 41 |
+| Elección / reforma judicial | 532 | 212 |
+| Muerte del Mencho | 65 | 25 |
+| Trump + amenazas / aranceles / militar | 201 | 129 |
+
+**`scripts/exportar_buscador.py` + `assets/buscador_plantilla.html`.** Ella no
+programa, así que el mismo buscador se compiló a una página web autocontenida:
+`data/outputs/buscador.html`, publicada como artefacto. El corpus entero viaja
+adentro en gzip+base64 —26.5 MB de JSON, 8.6 MB comprimidos, 11.55 MB de página
+contra un tope de 16— y se descomprime en el navegador con pako. No llama a
+ningún servidor. Regenerar la página después de cada reparseo es una línea.
+
+**La página no declara ninguna capacidad del visor, a propósito.** La primera
+versión pedía `downloads` para bajar un CSV y el artefacto quedó marcado como no
+compartible, que es justo lo que lo volvía inútil: existe para dársela a alguien
+de fuera. La exportación se resolvió sin permisos —copia al portapapeles
+separada por tabuladores, con una caja de respaldo y `Ctrl`+`C` si el visor tiene
+cerrado el portapapeles—. **Regla que sale de aquí: una página pensada para
+compartirse no declara capacidades.**
+
+Como el HTML es autocontenido, el respaldo si el enlace falla es mandar el
+archivo: abre con doble clic desde el disco, sin cuenta y sin internet salvo por
+la tipografía y pako.
+
+**Se decidió NO exportar la postura a esa página.** Reprobó la compuerta (57%,
+kappa 0.34) y en una herramienta que se usa sin nadie al lado que lo advierta,
+una columna llamada «postura» se cita. En el CSV de línea de comandos sí va,
+con la advertencia escrita en el `LEEME.md` que viaja con los archivos.
+
+**Lo que sí se exporta y hacía falta: quién responde.** Muchas preguntas no las
+contesta la presidenta —las pasa a Harfuch, a Gertz, a Ebrard— y eso es dato
+periodístico, no metadato. Va como etiqueta en cada resultado, como columna del
+CSV y como filtro propio. Un turno puede tener varias voces, así que el filtro
+descompone las combinaciones («Harfuch; Sheinbaum») y filtra por persona.
+
+**Consecuencia para el proyecto, y es la que importa:** lo que salga de aquí se
+publica con la firma de alguien más. Las advertencias tienen que viajar pegadas
+a los archivos, no quedarse en la conversación: búsqueda literal, ausencia en el
+corpus no es ausencia del salón, el nombre puede venir heredado del hilo, y la
+fuente citable es la estenográfica de gob.mx, no nuestro CSV.
+
+**Pendiente que no se hizo:** no hay pruebas en `tests/` para `buscar.py`. La
+función que arma el patrón (anclaje, raíces abiertas, acentos) es exactamente la
+clase de cosa que falla en silencio devolviendo cero resultados.
+
+---
+
 ## Estado al 2026-08-30, de madrugada
 
 ### LAS 150 ESTÁN CODIFICADAS. Y el resultado ya existe

@@ -117,6 +117,37 @@ def test_hay_presentaciones_sin_conector() -> None:
     ) == ("Eduardo Esquivel Ancona", "Domo de Cristal")
 
 
+def test_hay_quien_no_tiene_medio_y_su_medio_es_su_oficio() -> None:
+    """`Reyna Haydeé Ramírez, reportera independiente.` — sus 3 tandas.
+
+    Caía entre las dos ramas: sin `de` después del oficio para la rama con
+    conector, y con un oficio en minúscula donde la rama sin conector exige un
+    medio en mayúscula que no sea un oficio. Las 3 quedaban acreditadas al
+    periodista anterior, y son de tres personas distintas.
+    """
+    for texto in (
+        "Gracias, Presidenta. Reyna Haydee Ramírez, reportera independiente. Bueno.",
+        "Gracias, presidenta. Reyna Haydeé Ramírez, reportera independiente. Sobre esto.",
+    ):
+        nombre, medio = identidad_declarada(texto)
+        assert nombre.startswith("Reyna Hayde")
+        assert medio == "reportera independiente"
+
+
+def test_independiente_sin_oficio_no_abre_presentacion() -> None:
+    """La excepción exige el oficio pegado, y por eso existe el oficio ahí.
+
+    Medido sobre los 22,466 turnos: `<nombre>, independiente` sin oficio son 13
+    falsos positivos y cero presentaciones. La coma parte un adverbio.
+    """
+    assert identidad_declarada(
+        "Hemos visto una oposición, independiente de lo que diga el PAN."
+    ) is None
+    assert identidad_declarada(
+        "Del gobierno del estado, independiente de lo que pase."
+    ) is None
+
+
 def test_la_rama_sin_conector_no_se_traga_lugares_ni_cargos() -> None:
     """Los candados de la rama sin conector, que es la que puede inventar gente."""
     # Preposición o adverbio capitalizado al inicio de oración.
@@ -149,6 +180,87 @@ def test_el_medio_puede_cerrar_en_otro_cargo_y_no_solo_en_punto() -> None:
         "Movimiento Conciencia y colaboradora del programa Iztaccíhuatl en El "
         "Sendero de la Luna, así como de otros espacios"
     ) == ("Elideth Fernández", "Noticias del Movimiento Conciencia")
+
+
+def test_el_medio_cierra_donde_empieza_su_descripcion() -> None:
+    """Tere Mora Guillén se presenta así diez veces; las diez se perdían."""
+    assert identidad_declarada(
+        "Presidenta, buenos días. Soy Tere Mora Guillén, corresponsal del Canal de "
+        "las Noticias, que se transmite en el estado de Chihuahua y en Juárez, y en "
+        "los municipios fronterizos de Tijuana y Mexicali. Presidenta…"
+    ) == ("Tere Mora Guillén", "Canal de las Noticias")
+    assert identidad_declarada(
+        "Soy Tere Mora Guillén, corresponsal de Grupo Intermedia, al que pertenecen "
+        "el Canal 44 de Ciudad Juárez, el 66 de Mexicali y el 33 de Tijuana."
+    ) == ("Tere Mora Guillén", "Grupo Intermedia")
+
+
+def test_el_medio_cierra_en_puntos_suspensivos() -> None:
+    assert identidad_declarada("Hola, Presidenta, buenos días. Soy César Huerta, de la revista Polemón…") == (
+        "César Huerta", "revista Polemón")
+
+
+def test_la_presentacion_puede_venir_en_un_inciso_entre_rayas() -> None:
+    """A media pregunta: `—perdón, soy X, de Y—` y `—soy X, de Y—`."""
+    assert identidad_declarada(
+        "Presidenta Sheinbaum, tras un año de gobierno —perdón, soy Yesenia Peralta, "
+        "de Business Energy—, Presidenta, tras un año…"
+    ) == ("Yesenia Peralta", "Business Energy")
+    assert identidad_declarada(
+        "Este 16 de abril —soy Gloria Carpio, de Diario Imagen— este 16 de abril se celebra…"
+    ) == ("Gloria Carpio", "Diario Imagen")
+
+
+def test_el_medio_puede_terminar_despues_de_la_ventana() -> None:
+    """La presentación empieza en el carácter 270 y el medio cruza el 300."""
+    relleno = "Presidenta, en la región de la que vengo " + "pasa algo grave " * 14
+    texto = relleno + "—soy Susana Carreño, de Radio Universidad de Guadalajara. Ahí…"
+    assert texto.index("soy") < 300 < texto.index("Guadalajara")
+    assert identidad_declarada(texto) == ("Susana Carreño", "Radio Universidad de Guadalajara")
+    # Y una presentación que EMPIEZA después de la ventana sigue sin contar.
+    assert identidad_declarada("pasa algo grave " * 25 + "Fulano Mengano, de El Universal. Y…") is None
+
+
+def test_el_nombre_puede_venir_despues_del_saludo() -> None:
+    """`Buenos días, Vicente Serrano, de Sin Censura TV.`: el saludo ocupaba el inicio de oración."""
+    assert identidad_declarada("Buenos días, Vicente Serrano, de Sin Censura TV. Presidenta…") == (
+        "Vicente Serrano", "Sin Censura TV")
+    assert identidad_declarada("Muy buenos días, Presidenta. Todas, todos, todes, Inés Arroyo, de ACI Hidalgo.") == (
+        "Inés Arroyo", "ACI Hidalgo")
+    assert identidad_declarada("Buenos días, Presidenta Eliane Valadez, del canal de Eli TV Oficial.") == (
+        "Eliane Valadez", "canal de Eli TV Oficial")
+
+
+def test_el_saludo_no_abre_la_puerta_a_cualquier_coma() -> None:
+    """La lista de cortesías es cerrada: López Beltrán sigue sin ser periodista."""
+    assert identidad_declarada(
+        "Buenos días. Hoy acusan a Andrés Manuel López Beltrán, de encabezar una red de huachicol."
+    ) is None
+
+
+def test_sin_coma_solo_cuenta_quien_ya_se_presento_completo() -> None:
+    """`Nancy Flores de la revista Contralínea.` es idéntica a `Ley General de Alimentación Adecuada.`"""
+    texto = "Buenos días, Presidenta. Nancy Flores de la revista Contralínea. Le quería preguntar…"
+    assert identidad_declarada(texto) is None
+    assert identidad_declarada(texto, frozenset({"Nancy Flores"})) == ("Nancy Flores", "revista Contralínea")
+    assert identidad_declarada("Sobre la iniciativa. Ley General de Alimentación Adecuada.",
+                               frozenset({"Nancy Flores"})) is None
+
+
+def test_una_identidad_manual_manda_sobre_el_regex() -> None:
+    """`Mi nombre es Christian Mart y soy creador de contenido`: sin medio, nadie lo alcanza."""
+    turnos = [
+        Turno(CONFERENCIA_ID, 0, "PREGUNTA", None, None, "prensa",
+              "Presidenta, buenos días. Mi nombre es Christian Mart y soy creador de contenido."),
+        Turno(CONFERENCIA_ID, 1, "PRESIDENTA", None, "CLAUDIA SHEINBAUM PARDO", "funcionario", "Claro."),
+        Turno(CONFERENCIA_ID, 2, "PREGUNTA", None, None, "prensa", "¿Y qué música escucha usted?"),
+    ]
+    assert armar_hilos(turnos) == []
+    hilos = armar_hilos(turnos, {0: ("Christian Mart", None)})
+    assert len(hilos) == 1
+    assert hilos[0].metodo_identificacion == "manual"
+    assert (hilos[0].periodista, hilos[0].medio) == ("Christian Mart", None)
+    assert hilos[0].turnos[2].quien == "Christian Mart"
 
 
 def test_el_conector_admite_las_formas_verbales() -> None:

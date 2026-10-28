@@ -1,0 +1,39 @@
+# Presentaciones que una persona leyó en la estenográfica y que ningún patrón del lector alcanza.
+# Mandan sobre el regex: el hilo abre en ese turno y queda marcado `metodo_identificacion: manual`.
+# `periodista` es lo que dice la estenográfica (la canonización corre después).
+# `medio` vacío = la persona no nombró medio. Nulo antes que inventado: no se llena con el
+# medio que esa persona usa en otras tandas.
+# Revisadas a mano el 2026-10-28. Si una fila no abre hilo, `parseo` lo avisa.
+#
+# Fuera a propósito:
+#   2026-08-07 t98, «Mi nombre es Grecia»: participante del concurso México Canta. Su etiqueta
+#   viene incrustada dentro de un turno de prensa (`PARTICIPANTE DEL CONCURSO…:`); es un
+#   problema del partidor de etiquetas, no de identidad. No es prensa y no recibe tanda.
+conferencia_id,orden,periodista,medio,nota
+2024-11-07,39,Olga Ojeda Lajud,Grupo Imagen del Golfo,«soy corresponsal del Grupo Imagen del Golfo que tiene cinco periódicos»: subordinada sin coma
+2024-11-13,5,Zujey Luna,,"«Mi nombre es Zujey Luna, vengo desde el estado de Durango»: no nombra medio"
+2024-11-25,58,Daniel Robles Haro,Yo también,«he sido acreditado por parte de la revista Yo también»
+2024-11-25,97,Tere Moya Guillén,Grupo Intermedia,«corresponsal del Grupo Intermedia del Canal 44 de Ciudad Juárez…»: el medio pasa de 100 caracteres
+2024-12-02,17,Katia D'Artigues,Yo también,«represento a Yo también»: el apóstrofo rompe el patrón de nombre
+2025-01-13,7,Lucio Espinoza Chavira,TV Baja,«vengo de La Paz Baja California Sur de TV Baja»
+2025-01-13,54,Arnoldo Cuellar,Laboratorio de Periodismo y Opinión Pública,«de un medio que se llama Laboratorio de Periodismo y Opinión Pública POPLab»
+2025-01-16,143,Alejandro Patrón,,«soy Alejandro Patrón reportero urbano»: no nombra medio
+2025-04-01,74,Jean Michel-Leprince,CBC Radio-Canadá,«corresponsal de la televisión nacional pública de Canadá CBC Radio-Canadá»
+2025-04-07,43,Christian Mart,,«Mi nombre es Christian Mart y soy creador de contenido de redes sociales»: no nombra medio
+2025-04-07,55,Orlando Zúñiga,,«Mi nombre es Orlando Zúñiga me dedico al contenido y estrategia digital»: no nombra medio
+2025-04-29,168,Kate Linthicum,Los Ángeles Times,«una periodista con el medio Los Ángeles Times»
+2025-08-25,119,Juan Carlos Sagredo,Siker.com,«vengo de Jalisco soy reportero de Siker.com»
+2025-09-24,112,María Hinojosa,Latino USA,«representando a Latino USA»; el regex leía «Madam President» en su texto en inglés
+2025-09-25,65,Carlos Pozos,LM News,«My name es Carlos Pozos from LM News»
+2025-10-06,58,Alejandro Cabral,AMARC México y Política de Rock and Roll Radio,el medio pasa de 100 caracteres
+2025-10-06,174,Daniel Robles Haro,,«Mi nombre es Daniel Robles Haro.»: no nombra medio en esta tanda
+2025-12-10,39,Adriana Cardona-Maguigad,Chicago Sun Times,«periodista en Chicago para la radio pública y para el Chicago Sun Times»
+2026-02-18,61,Raúl Benet,Red de Radios Comunitarias de México y Radio Tepoztlán,el medio pasa de 100 caracteres
+2026-05-14,55,Yesenia Peralta,,«—soy Yesenia Peralta—»: no nombra medio en esta tanda
+2026-06-03,68,Raúl Benet,Radio Tepoztlán,el medio pasa de 100 caracteres
+2026-06-17,88,Patricia Villegas,Telesur,«Le saluda Patricia Villegas soy periodista colombiana presidenta de Telesur»
+2026-08-27,52,Patricia Hernández,Fundación Fusión Latina Chicago,no es periodista: representa a una fundación; se abre su tanda para no cargarle sus preguntas a otra persona
+2026-06-17,106,Lupis,El Ombligo de la Luna México,"«Lupis, de El Ombligo de la Luna México»: nombre de una sola palabra sin «soy», que el lector rechaza a propósito"
+2026-06-17,127,Bertha Alicia Galindo,Alcanzando el Conocimiento y Noti 13,"«Bertha Alicia Galindo…» y el medio en el turno siguiente: «…Alcanzando el Conocimiento y Noti 13»"
+2024-12-10,96,Ramón Flores,Centinela Informa and The Human Hoy,"«—bueno, Ramón Flores, Centinela Informa and The Human Hoy de Inglaterra, perdón—»: sin conector y dentro de un inciso"
+2025-01-24,54,Ramón Flores,Centinela Informa and The Human Hoy,"«—Ramón Flores, Centinela Informa and The Human Hoy de Inglaterra—»: sin conector y dentro de un inciso"

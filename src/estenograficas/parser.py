@@ -441,12 +441,26 @@ _PALABRA_NOMBRE = r"[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+"
 # solo punto, y exigirlo perdía sus 12 turnos completos. Se admite cerrar
 # también en `y <oficio>` o en `, así como`, que es exactamente donde la
 # persona deja de nombrar su medio y pasa a su siguiente cargo.
+#
+# Y cierra donde empieza a describirse: `Tere Mora Guillén, corresponsal del
+# Canal de las Noticias, que se transmite en el estado de Chihuahua…` o `…de
+# Grupo Intermedia, al que pertenecen el Canal 44…` pasan de cien caracteres
+# sin punto. Ella se presenta así diez veces y las diez se perdían: no existía
+# en los conteos y sus preguntas se repartían entre otros. La subordinada de
+# relativo y la coletilla con `con` son justo lo que separa una cabecera de su
+# descripción (ver CLAUDE.md, Canonización).
+#
+# Cierra también en puntos suspensivos (`Soy César Huerta, de la revista
+# Polemón…`) y en raya, porque hay quien se presenta a media pregunta dentro de
+# un inciso: `—perdón, soy Yesenia Peralta, de Business Energy—`.
+_CIERRE = r"\.\!\?\n…—―"
 _FIN_MEDIO = (
-    r"(?:\s*[\.\!\?\n]"
+    r"(?:\s*[" + _CIERRE + r"]"
     r"|\s*,\s+(?:y\s+)?(?:así\s+como|además)\b"
+    r"|\s*,\s+(?:que|al\s+que|a\s+la\s+que|el\s+cual|la\s+cual|donde|con)\s"
     r"|\s+y\s+(?:soy\s+)?(?:" + _OFICIO + r")\b)"
 )
-_MEDIO = r"(?P<medio>[^\.\!\?\n]{2,100}?)" + _FIN_MEDIO
+_MEDIO = r"(?P<medio>[^" + _CIERRE + r"]{2,100}?)" + _FIN_MEDIO
 
 # El conector admite `de`, `del` y `para` (`Manuel Pedrero, para Los Reporteros`
 # aparece 41 veces), y deja pasar un `soy` antes del oficio
@@ -474,8 +488,16 @@ _CONECTOR_SUAVE = (
 # `Por cierto, soy Gregorio Varela, de Cinco Radio`, `Presidenta con "A", su
 # servidor Carlos Pozos`. Sin muletilla el ancla sigue siendo el inicio de
 # oración, porque ahí es donde vive el falso positivo de López Beltrán.
-_ANCLA_SUAVE = r"(?:^|(?<=[\.\!\?])\s|(?<=[,;:])\s|^\s*)"
-_ANCLA_DURA = r"(?:^|(?<=[\.\!\?])\s|^\s*)"
+# También tras una raya: `Este 16 de abril —soy Gloria Carpio, de Diario Imagen— …`.
+_ANCLA_SUAVE = r"(?:^|(?<=[\.\!\?…])\s|(?<=[,;:])\s|(?<=[—―])\s*|^\s*)"
+# Los puntos suspensivos también cierran oración (`…al elegirse… Primero, Manuel
+# Galeazzi, de Sin Línea`), y la raya abre un inciso donde cabe una
+# presentación entera: `Buenos días, Presidenta ―Ramón Flores, del Centinela Informa―`.
+_ANCLA_DURA = r"(?:^|(?<=[\.\!\?…])\s|(?<=[—―])\s*|^\s*)"
+# La rama sin conector es la más laxa y se queda con el ancla original: tras
+# raya o puntos suspensivos leía `―Guardia Nacional, Marina, Ejército―` y
+# `Quatro Media Telecomunicaciones, Veracruz, Carlos Guzmán` como presentaciones.
+_ANCLA_ORACION = r"(?:^|(?<=[\.\!\?])\s|^\s*)"
 
 # Hay quien se presenta SIN conector: `Eduardo Esquivel Ancona, Domo de
 # Cristal.`, `Bertha Alicia Galindo, Alcanzando el Conocimiento.` No es un
@@ -495,8 +517,28 @@ _TRATAMIENTO = (
     r"[Dd]iputad[oa]|[Ss]enador[a]?|[Tt]itular|[Dd]irector[a]?\s+general|"
     r"[Ss]ubsecretari[oa]|[Aa]lcaldes?a?|[Ff]iscal|[Mm]inistr[oa]|[Cc]omisionad[oa])\b"
 )
+# Hay quien NO TIENE MEDIO, y entonces su medio es su oficio: `Reyna Haydeé
+# Ramírez, reportera independiente.` Cae entre las dos ramas y se pierde
+# entera. Por (b) no pasa porque después del oficio no viene `de`; por (c)
+# tampoco, porque el candado que rechaza abrir con un oficio —el que existe
+# para `Canal del Congreso, Elizabeth Robles`— está escrito suponiendo que el
+# oficio nunca es el medio, y aquí lo es. Se suma la minúscula, que también la
+# descarta.
+#
+# La excepción exige el oficio pegado a `independiente`, y eso no es
+# ceremonia: medido sobre los 22,466 turnos, `<nombre>, independiente` sin
+# oficio son **13 falsos positivos y cero presentaciones** —`hemos visto una
+# oposición, independiente…`, `del gobierno del estado, independiente…`—,
+# donde la palabra es un adverbio truncado por la coma. Con el oficio pegado
+# salen exactamente las 3 de ella y ninguna más.
+#
+# No se admite `free lance` ni `por mi cuenta`: cero ocurrencias en el corpus.
+_MEDIO_SIN_MEDIO = _OFICIO + r"\s+independiente\b"
+
 _SIN_CONECTOR = (
-    r"\s*,\s+(?!" + _TRATAMIENTO + r")(?!" + _OFICIO + r"\b)(?=[A-ZÁÉÍÓÚÑ])"
+    r"\s*,\s+(?!" + _TRATAMIENTO + r")"
+    r"(?:(?=" + _MEDIO_SIN_MEDIO + r")"
+    r"|(?!" + _OFICIO + r"\b)(?=[A-ZÁÉÍÓÚÑ]))"
 )
 
 # Sin `de` que delimite, cualquier oración que empiece con preposición o
@@ -517,7 +559,39 @@ _NO_ABRE_NOMBRE = (
     r"Muy|Más|Menos|Todo|Toda|Todos|Todas|Este|Esta|Estos|Estas|Ese|Esa|Otro|"
     r"Otra|Solo|Sólo|Salvo|Respecto|Mi|Su|Nuestro|Nuestra|Le|Les|Lo|La|El|"
     r"Canal|Radio|Grupo|Diario|Revista|Periódico|Noticias|Noticiero|Televisa|"
-    r"Portal|Agencia|Semanario|Estación)\b"
+    r"Portal|Agencia|Semanario|Estación|Soy)\b"
+)
+
+# Hay quien dice su nombre después de saludar, en la misma oración:
+# `Buenos días, Vicente Serrano, de Sin Censura TV.`, `Primero, Manuel Galeazzi,
+# de Sin Línea…`, `Todas, todos, todes, Inés Arroyo, de ACI Hidalgo`. El ancla
+# dura exige inicio de oración y ahí estaba el saludo, así que la tanda entera
+# se le cargaba al periodista anterior. Se admite **solo** una lista cerrada de
+# fórmulas de cortesía antes del nombre: abrir el ancla a cualquier coma
+# resucita `…a Andrés Manuel López Beltrán, de encabezar una red`.
+_PREAMBULO = (
+    r"(?i:(?:muy\s+)?buen[oa]s?\s+(?:d[ií]as?|tardes|noches)|qu[eé]\s+tal|hola|"
+    r"(?:muchas\s+)?gracias|(?:se[ñn]ora\s+)?presidenta(?:\s+(?:claudia|sheinbaum))?|"
+    r"doctora|primero|perd[oó]n|bueno|todas|todos|todes|compa[ñn]er[oa]s)"
+)
+# `Buenos días, Presidenta Eliane Valadez, del canal…`: la estenográfica no puso
+# coma tras «Presidenta» y el nombre salía «Presidenta Eliane Valadez».
+_CORTESIA = (r"(?:" + _PREAMBULO + r"\s*,\s*)*"
+             r"(?:(?i:presidenta)\s+(?!Claudia\b|Sheinbaum\b))?")
+
+# Sin coma: `Buenos días, Presidenta. Nancy Flores de la revista Contralínea.`
+# Sin la coma no hay nada que separe una presentación de una mención
+# (`Ernestina Godoy de la Fiscalía dijo…`), así que se exige que nombre y medio
+# sean **la oración entera**: inicio de oración, medio corto, sin comas, y punto
+# final inmediato. Una mención sigue con un verbo; una presentación se acaba.
+_IDENTIDAD_SIN_COMA = re.compile(
+    _ANCLA_DURA + _CORTESIA + r"(?:" + _MULETILLA + r")?"
+    + r"(?!" + _NO_ABRE_NOMBRE + r")"
+    + r"(?P<nombre5>" + _NOMBRE + r")"
+    + r"\s+(?:de|del|para)\s+(?:la\s+|el\s+)?"
+    + r"(?P<medio>(?:[A-ZÁÉÍÓÚÑ]|(?:revista|peri[oó]dico|canal|portal|diario|agencia|radio)\s)"
+    + r"[^,;:" + _CIERRE + r"]{1,50}?)\s*[\.\!\?\n…]",
+    re.MULTILINE,
 )
 
 _IDENTIDAD = re.compile(
@@ -533,14 +607,14 @@ _IDENTIDAD = re.compile(
     #     Lleva el mismo candado de apertura que la rama c: sin él, `Del
     #     Operativo Enjambre, de la detención de algunos presidentes
     #     municipales` produce un periodista llamado «Del Operativo Enjambre».
-    + _ANCLA_DURA + r"(?!" + _NO_ABRE_NOMBRE + r")"
+    + _ANCLA_DURA + _CORTESIA + r"(?!" + _NO_ABRE_NOMBRE + r")"
     + r"(?P<nombre2>" + _NOMBRE + r")"
     + _CONECTOR
     + r"|"
     #  c) sin conector: `Nombre Apellido, Medio.` La muletilla, si viene, se
     #     consume aparte: sin eso el periodista queda registrado como
     #     `Soy Jonathan Lozada`, que es un nombre nuevo cada vez.
-    + _ANCLA_DURA + r"(?:" + _MULETILLA + r")?"
+    + _ANCLA_ORACION + _CORTESIA + r"(?:" + _MULETILLA + r")?"
     + r"(?!" + _NO_ABRE_NOMBRE + r")"
     + r"(?P<nombre3>" + _NOMBRE + r")"
     + _SIN_CONECTOR
@@ -553,6 +627,10 @@ VENTANA_IDENTIDAD = 300
 """Solo se miran los primeros 300 caracteres: regla dura 4 de CLAUDE.md."""
 
 
+EXTRA_MEDIO = 110
+"""Lo que se deja correr el medio más allá de la ventana (su tope es 100)."""
+
+
 COLA_IDENTIDAD = 260
 """Ancho de la cola del turno donde también se busca la presentación."""
 
@@ -560,7 +638,7 @@ COLA_IDENTIDAD = 260
 MARCA_REDACTADA = "[identificación removida]"
 
 
-def _buscar_identidad(texto: str) -> tuple[re.Match | None, int]:
+def _buscar_identidad(texto: str, conocidos: frozenset[str] | None = None) -> tuple[re.Match | None, int]:
     """Busca la presentación y devuelve `(match, desplazamiento)`.
 
     Primero en la ventana de apertura, que es donde vive el 99% de las
@@ -574,8 +652,16 @@ def _buscar_identidad(texto: str) -> tuple[re.Match | None, int]:
     conversación cualquier nombre propio es alguien de quien se habla, y la
     muletilla es lo único que distingue presentarse de mencionar.
     """
-    m = _IDENTIDAD.search(texto[:VENTANA_IDENTIDAD])
-    if m:
+    # La presentación tiene que EMPEZAR en la ventana, pero el medio puede
+    # terminar fuera: `…de la región donde vengo —soy Susana Carreño, de Radio
+    # Universid` queda cortado justo en el carácter 300 y se perdía entero.
+    m = _IDENTIDAD.search(texto[:VENTANA_IDENTIDAD + EXTRA_MEDIO])
+    if m and m.start() < VENTANA_IDENTIDAD:
+        return m, 0
+    # Sin coma la forma no basta (`Ley General de Alimentación…` es idéntica):
+    # solo cuenta alguien que en otra tanda SÍ se presentó con todas sus letras.
+    m = _IDENTIDAD_SIN_COMA.search(texto[:VENTANA_IDENTIDAD]) if conocidos else None
+    if m and " ".join(m.group("nombre5").split()) in conocidos:
         return m, 0
     if len(texto) <= VENTANA_IDENTIDAD:
         return None, 0
@@ -605,18 +691,19 @@ def redactar_identificacion(texto: str) -> tuple[str, bool]:
     return texto[:i] + MARCA_REDACTADA + texto[j:], True
 
 
-def identidad_declarada(texto: str) -> tuple[str, str] | None:
+def identidad_declarada(texto: str, conocidos: frozenset[str] | None = None) -> tuple[str, str] | None:
     """Extrae (nombre, medio) de la autopresentación, o None.
 
     Mira la ventana de apertura y, si ahí no hay nada, la cola del turno. Un
     nombre propio a la mitad es alguien de quien se habla, no quien habla; por
     eso el medio del turno nunca se inspecciona.
     """
-    m, _ = _buscar_identidad(texto)
+    m, _ = _buscar_identidad(texto, conocidos)
     if not m:
         return None
     medio = re.sub(r"\s+", " ", m.group("medio")).strip(" ,;")
-    nombre = m.group("nombre") or m.group("nombre2") or m.group("nombre3")
+    g = m.groupdict()
+    nombre = g.get("nombre") or g.get("nombre2") or g.get("nombre3") or g.get("nombre5")
     return " ".join(nombre.split()), medio
 
 
@@ -687,7 +774,9 @@ def _rachas_de_prensa(turnos: list[Turno]) -> set[int]:
     return inciertos
 
 
-def armar_hilos(turnos: list[Turno]) -> list[Hilo]:
+def armar_hilos(turnos: list[Turno],
+                manuales: dict[int, tuple[str, str | None]] | None = None,
+                conocidos: frozenset[str] | None = None) -> list[Hilo]:
     """Agrupa los turnos en hilos, uno por tanda de periodista.
 
     Un hilo abre cuando un turno de prensa trae autopresentación y se extiende
@@ -696,19 +785,28 @@ def armar_hilos(turnos: list[Turno]) -> list[Hilo]:
 
     La identidad se propaga hacia adelante dentro del hilo, salvo en los turnos
     marcados inciertos, que se quedan sin periodista. Nulo antes que inventado.
+
+    `manuales` (`orden -> (nombre, medio)`) son presentaciones que una persona
+    leyó y ningún patrón alcanza: `Mi nombre es Christian Mart y soy creador de
+    contenido`, sin medio. Mandan sobre el regex y el hilo queda marcado
+    `manual`. Vienen de `config/identidades_manuales.csv`.
     """
+    manuales = manuales or {}
     inciertos = _rachas_de_prensa(turnos)
 
-    aperturas: list[tuple[int, str, str]] = []
+    aperturas: list[tuple[int, str, str | None, str]] = []
     for i, t in enumerate(turnos):
+        if t.tipo == "prensa" and t.orden in manuales:
+            aperturas.append((i, *manuales[t.orden], "manual"))
+            continue
         if t.tipo != "prensa" or i in inciertos:
             continue
-        ident = identidad_declarada(t.texto)
+        ident = identidad_declarada(t.texto, conocidos)
         if ident:
-            aperturas.append((i, ident[0], ident[1]))
+            aperturas.append((i, ident[0], ident[1], "regex"))
 
     hilos: list[Hilo] = []
-    for n, (inicio, nombre, medio) in enumerate(aperturas):
+    for n, (inicio, nombre, medio, metodo) in enumerate(aperturas):
         fin = aperturas[n + 1][0] if n + 1 < len(aperturas) else len(turnos)
         del_hilo: list[TurnoDeHilo] = []
         for i in range(inicio, fin):
@@ -745,7 +843,7 @@ def armar_hilos(turnos: list[Turno]) -> list[Hilo]:
                 periodista=nombre,
                 medio=medio,
                 periodista_canonico=None,
-                metodo_identificacion="regex",
+                metodo_identificacion=metodo,
                 turnos=del_hilo,
             )
         )
@@ -779,13 +877,14 @@ class Conferencia:
         return len(self.turnos) - len(en_hilos)
 
 
-def parsear(texto: str, conferencia_id: str) -> Conferencia:
+def parsear(texto: str, conferencia_id: str,
+            manuales: dict[int, tuple[str, str | None]] | None = None) -> Conferencia:
     """Parsea una conferencia completa. Sin red, sin modelo, sin estado."""
     limpio, n_videos, huerfanos = quitar_videos(normalizar_espacios(texto))
     limpio, tenia_fin = quitar_fin_de_documento(limpio)
     encabezado, cuerpo = separar_encabezado(limpio)
     turnos = partir_turnos(cuerpo, conferencia_id)
-    hilos = armar_hilos(turnos)
+    hilos = armar_hilos(turnos, manuales)
     return Conferencia(
         conferencia_id=conferencia_id,
         encabezado=encabezado,
@@ -858,11 +957,12 @@ def texto_desde_html(html: str) -> str:
     return "\n\n".join(partes)
 
 
-def parsear_archivo(ruta: Path) -> Conferencia:
+def parsear_archivo(ruta: Path,
+                    manuales: dict[int, tuple[str, str | None]] | None = None) -> Conferencia:
     """Parsea un fixture. El id sale del nombre: 2026-08-18.txt o .html."""
     crudo = ruta.read_text(encoding="utf-8", errors="replace")
     texto = texto_desde_html(crudo) if ruta.suffix.lower() in (".html", ".htm") else crudo
-    return parsear(texto, ruta.stem)
+    return parsear(texto, ruta.stem, manuales)
 
 
 def escribir_jsonl(registros: Iterable[Any], destino: Path) -> int:

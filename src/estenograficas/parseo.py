@@ -20,6 +20,8 @@ lo que exige la regla dura 2. El checkpoint se usa para el archivo de rechazos.
 
 from __future__ import annotations
 
+import csv
+
 import json
 import random
 import re
@@ -181,6 +183,62 @@ def diagnostico(
 # ---------------------------------------------------------------------------
 
 
+def llenar_canonico(hilos: list) -> int:
+    """Escribe `periodista_canonico` en cada hilo. Devuelve cuántos se fusionaron.
+
+    El campo está en el contrato de `hilos.jsonl` desde el principio y se venía
+    escribiendo `None`: `canonizar` existía y no lo llamaba nadie, así que
+    `Reyna Haydee Ramírez` y `Reyna Haydeé Ramírez` contaban como dos personas
+    y `config/canonico_periodistas.csv` —las decisiones que el humano tomó a
+    mano el 2026-09-03— no se aplicaba en ninguna parte.
+
+    **`periodista` no se toca.** Guarda lo que dijo la estenográfica, que es lo
+    único verificable contra la fuente; el nombre unificado vive aparte. Quien
+    cuente por persona usa `periodista_canonico`; quien audite una atribución
+    usa `periodista`.
+
+    Solo canoniza nombres. Los medios son otra decisión —una tanda puede nombrar
+    cinco cabeceras— y no se resuelve aquí.
+    """
+    from .canonizar import canonizar_nombres, cargar
+    from .config import paths
+
+    frec = Counter(h.periodista for h in hilos if h.periodista)
+    mp, _ = cargar(paths().root / "config")
+    mapa, dudosos = canonizar_nombres(frec, mp)
+
+    for h in hilos:
+        h.periodista_canonico = mapa.get(h.periodista) if h.periodista else None
+
+    fusiones = sum(1 for k, v in mapa.items() if k != v)
+    print(f"\ncanonización de nombres: {len(frec)} variantes -> "
+          f"{len(set(mapa.values()))} personas ({fusiones} fusiones)")
+    for a, fa, b, fb in dudosos:
+        print(f"   DUDOSO, sin fusionar: {a} ({fa}) vs {b} ({fb})")
+    return fusiones
+
+
+def cargar_identidades_manuales(ruta: Path) -> dict[str, dict[int, tuple[str, str | None]]]:
+    """`conferencia -> {orden -> (periodista, medio)}` desde la tabla escrita a mano.
+
+    Los comentarios se quitan antes de leer, y si falta una columna se levanta
+    excepción: un CSV con `#` arriba se lee vacío sin avisar (CLAUDE.md).
+    """
+    if not ruta.exists():
+        return {}
+    lineas = [l for l in ruta.read_text(encoding="utf-8-sig").splitlines()
+              if l.strip() and not l.lstrip().startswith("#")]
+    filas = list(csv.DictReader(lineas))
+    faltan = {"conferencia_id", "orden", "periodista", "medio"} - set(filas[0] if filas else {})
+    if filas and faltan:
+        raise ValueError(f"{ruta} no tiene las columnas {sorted(faltan)}")
+    out: dict[str, dict[int, tuple[str, str | None]]] = {}
+    for r in filas:
+        out.setdefault(r["conferencia_id"].strip(), {})[int(r["orden"])] = (
+            r["periodista"].strip(), r["medio"].strip() or None)
+    return out
+
+
 def main() -> int:
     """`python -m estenograficas.parseo`"""
     from .checkpoint import Checkpoint
@@ -194,6 +252,7 @@ def main() -> int:
         print(f"No hay nada en {p.raw}. Correr antes: python -m estenograficas.descarga")
         return 1
 
+    manuales = cargar_identidades_manuales(p.root / "config" / "identidades_manuales.csv")
     ck = Checkpoint("parseo")
     # Se limpia el registro previo: esta etapa reescribe todo en cada corrida,
     # así que arrastrar rechazos viejos mentiría sobre el estado actual.
@@ -205,7 +264,7 @@ def main() -> int:
     registros: list[RegistroConferencia] = []
     for i, arch in enumerate(archivos, 1):
         try:
-            c = parsear_archivo(arch)
+            c = parsear_archivo(arch, manuales.get(arch.stem))
             if not c.turnos:
                 raise ValueError("cero turnos: el archivo no produjo nada")
             confs.append(c)
@@ -216,6 +275,27 @@ def main() -> int:
             ck.marcar_rechazado(arch.stem, razon=f"{type(e).__name__}: {e}")
         if i % 100 == 0:
             print(f"   {i}/{len(archivos)}")
+
+    # Segunda pasada, solo de hilos: la forma sin coma (`Nancy Flores de la
+    # revista Contralínea.`) se acepta únicamente para nombres que en algún
+    # lugar del corpus se presentaron completos. Los turnos no cambian.
+    from .parser import armar_hilos
+    conocidos = frozenset(h.periodista for c in confs for h in c.hilos if h.periodista)
+    for c in confs:
+        c.hilos = armar_hilos(c.turnos, manuales.get(c.conferencia_id), conocidos)
+    registros = [resumir(c) for c in confs]
+
+    # Cada fila de la tabla manual tiene que haber abierto un hilo. Si no, el
+    # turno no existe o no es de prensa, y eso se dice: nada se ignora en silencio.
+    usados = {(h.conferencia_id, h.turnos[0].orden) for c in confs for h in c.hilos
+              if h.metodo_identificacion == "manual"}
+    for conf, filas in manuales.items():
+        for orden, (nombre, _) in filas.items():
+            if (conf, orden) not in usados:
+                print(f"   AVISO: identidad manual sin aplicar: {conf} turno {orden} ({nombre})")
+    print(f"identidades manuales aplicadas: {len(usados)}")
+
+    llenar_canonico([h for c in confs for h in c.hilos])
 
     n_t = escribir_jsonl((t for c in confs for t in c.turnos), p.turnos)
     n_h = escribir_jsonl((h for c in confs for h in c.hilos), p.hilos)
